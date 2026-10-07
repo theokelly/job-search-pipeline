@@ -53,6 +53,9 @@ Then open **http://localhost:8501** in your browser.
 .venv/bin/job-agent generate              # generate materials for pending Strong Fit jobs
 .venv/bin/job-agent generate --tiers "Strong Fit,Worth Reviewing"   # include WR tier
 .venv/bin/job-agent status                # DB stats and tier breakdown
+.venv/bin/job-agent doctor                # health check: profile, env, file sync status (read-only)
+.venv/bin/job-agent sync-profile          # dry-run Drive → local sync for profile files (add --apply to write)
+.venv/bin/job-agent sync-profile --file starls --verbose   # one file, full diff
 ```
 
 ### Output structure
@@ -153,11 +156,28 @@ To find a Greenhouse token: check `https://boards.greenhouse.io/{token}`. To fin
 
 | File | When to update |
 |---|---|
-| `profile/theo.yaml` | Add companies, tweak dealbreakers/rubric, update target roles |
+| `profile/theo.yaml` | Add companies, tweak dealbreakers/rubric, update target roles (validated on load — typos fail fast) |
 | `profile/narrative_guidance.md` | Refine positioning, add new framing, adjust what to emphasize |
-| `profile/resume_versions/ai_focused.md` | Sync from PPTX when resume is updated |
-| `profile/accomplishments/starls.md` | Add new STARLs as written |
+| `profile/resume_versions/ai_focused.md` | Regenerate from PPTX: `scripts/extract_resume.py profile/resume_versions/TheoKelly_CV_Amsterdam.pptx profile/resume_versions/ai_focused.md --check` |
+| `profile/accomplishments/starls.md` | Auto-synced from Google Drive (see below) |
+| `profile/accomplishments/brag_sheet.md` | Auto-synced from Google Drive (see below) |
+| `profile/voice/elevator_pitch.md` | Auto-synced from Google Drive (see below) |
 | `profile/voice/cover_letter_examples.md` | Add approved letters as few-shot examples |
+
+---
+
+## Google Drive sync
+
+`starls.md`, `brag_sheet.md`, and `elevator_pitch.md` are synced from Google Docs (Drive is the source of truth). Google Docs are converted to markdown via the Docs API, preserving headings, bold/italic, and lists.
+
+```bash
+.venv/bin/job-agent sync-profile              # dry-run: show what would change
+.venv/bin/job-agent sync-profile --apply      # write Drive content to local files
+```
+
+With `profile_sync.sync_on_load: true` in `theo.yaml`, generation (`job-agent generate` and the UI's Generate button) auto-syncs first — skipped if synced within the last 15 minutes, and never breaks generation if Drive is unreachable.
+
+One-time OAuth setup: create a Desktop-app OAuth client in Google Cloud Console (enable Drive API + Docs API), save the client secrets to `data/drive_client.json`, then run `python3 scripts/drive_auth_local.py` on your Mac (needs a browser). Token lands in `data/drive_token.json`. File mappings live in the `profile_sync:` block of `theo.yaml`.
 
 ---
 

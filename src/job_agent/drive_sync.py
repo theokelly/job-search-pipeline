@@ -11,6 +11,8 @@ theo.yaml::
           local_path: "profile/accomplishments/starls.md"
 
 Manual trigger, dry-run/diff first — never silently overwrites local files.
+Also supports auto-sync before generation loads (see sync_on_load in
+config.py's _maybe_sync_profile).
 """
 from __future__ import annotations
 
@@ -93,11 +95,6 @@ def get_google_services(profile: dict):
         )
     return (build("drive", "v3", credentials=creds),
             build("docs", "v1", credentials=creds))
-
-
-def get_drive_service(profile: dict):
-    """Backwards-compatible: Drive service only."""
-    return get_google_services(profile)[0]
 
 
 # ---------------------------------------------------------------------------

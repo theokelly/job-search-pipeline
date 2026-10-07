@@ -1,8 +1,9 @@
 # Work Plan — Architecture Cleanup + Material-Update Automation
 
 Sketched 2026-10-07. Sequenced so each phase de-risks the next.
-Status: Phase A blocked on manual `git init` (no shell access from agent).
-No code edits until Phase A is complete.
+Status: **Complete.** Phases A–C finished and committed 2026-10-07
+(A: `7aed207`, B1: `52cd524`, B2–B6+C2: `e875765`, C3: commit, C1+auto-sync: commit).
+The phases below are kept as a historical record of what was done.
 
 ---
 
