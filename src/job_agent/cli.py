@@ -304,5 +304,13 @@ def status(
         typer.echo(f"{'='*50}\n")
 
 
+@app.command()
+def doctor():
+    """Check pipeline health: env, profile validity, and source staleness. Read-only."""
+    _bootstrap()
+    from .doctor import run_doctor
+    raise typer.Exit(code=run_doctor())
+
+
 if __name__ == "__main__":
     app()
