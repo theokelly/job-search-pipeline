@@ -1,7 +1,7 @@
 """Discovery stage: fetch new postings from all sources, pre-filter, upsert.
 
-Sources: LinkedIn guest API, Gmail alert ingestion, Greenhouse + Lever ATS
-APIs. Rule-based pre-filter runs before anything is saved; JD backfill
+Sources: LinkedIn guest API, Gmail alert ingestion, Greenhouse + Lever + Ashby
+ATS APIs. Rule-based pre-filter runs before anything is saved; JD backfill
 fills in descriptions for LinkedIn jobs missing them.
 
 Imports inside functions are lazy so that `job-agent --help` and
@@ -36,6 +36,7 @@ def run_discover(
     from ..config import load_profile
     from ..discovery.greenhouse import fetch_jobs as gh_fetch
     from ..discovery.lever import fetch_jobs as lever_fetch
+    from ..discovery.ashby import fetch_jobs as ashby_fetch
     from ..filter import pre_filter
     from sqlmodel import select as sql_select
 
@@ -116,8 +117,9 @@ def run_discover(
         name = company.get("name", "")
         gh_token = company.get("greenhouse_token")
         lever_slug = company.get("lever_slug")
+        ashby_board = company.get("ashby_board")
 
-        if not gh_token and not lever_slug:
+        if not gh_token and not lever_slug and not ashby_board:
             continue
 
         jobs = []
@@ -131,6 +133,11 @@ def run_discover(
                 jobs += lever_fetch(name, lever_slug)
             except Exception as e:
                 echo(f"  [lever] {name}: {e}")
+        if ashby_board:
+            try:
+                jobs += ashby_fetch(name, ashby_board)
+            except Exception as e:
+                echo(f"  [ashby] {name}: {e}")
 
         for job in jobs:
             counts["found"] += 1

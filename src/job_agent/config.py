@@ -186,6 +186,7 @@ _PROFILE_SPEC: dict[str, object] = {
         "ats_type": (str, type(None)),
         "greenhouse_token": (str, type(None)),
         "lever_slug": (str, type(None)),
+        "ashby_board": (str, type(None)),
         "priority": (str, type(None)),
         "size": (str, type(None)),
         "notes": (str, type(None)),
@@ -271,6 +272,19 @@ _PROFILE_SPEC: dict[str, object] = {
         "base_pptx_drive_id": str,
         "output_parent_folder_id": str,
         "upload_to_drive": bool,
+    },
+    # Optional: vetted standard answers for application forms. Missing keys
+    # become TODO markers in the generated answers.md.
+    "application_answers": {
+        "work_authorization": (str, type(None)),
+        "visa_sponsorship": (str, type(None)),
+        "location": (str, type(None)),
+        "willing_to_relocate": (str, type(None)),
+        "salary_expectation": (str, type(None)),
+        "salary_guidance": (str, type(None)),
+        "notice_period": (str, type(None)),
+        "earliest_start_date": (str, type(None)),
+        "languages": (str, type(None)),
     },
 }
 

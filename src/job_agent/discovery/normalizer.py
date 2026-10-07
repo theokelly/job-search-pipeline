@@ -41,3 +41,25 @@ def normalize_lever(company: str, raw: dict) -> Job:
         last_seen=now,
         status="active",
     )
+
+
+def normalize_ashby(company: str, raw: dict) -> Job:
+    title = raw.get("title", "")
+    location = raw.get("locationName", "") or ""
+    if raw.get("isRemote") and "remote" not in location.lower():
+        location = f"{location} (Remote)".strip()
+    url = raw.get("jobUrl", "")
+    description = raw.get("descriptionHtml", "") or raw.get("descriptionPlain", "") or ""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return Job(
+        id=job_id(company, title, location),
+        source="ashby_api",
+        company=company,
+        title=title,
+        location=location,
+        url=url,
+        description_raw=description,
+        first_seen=now,
+        last_seen=now,
+        status="active",
+    )

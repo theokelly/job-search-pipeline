@@ -889,6 +889,17 @@ def render_job_detail(job_id: str):
                 st.markdown(cl_text)
             else:
                 st.warning("Cover letter file not found at expected path.")
+            gc_text = read_material(app.materials_path, "grounding_check.md")
+            if gc_text:
+                needs_review = "**Verdict:** REVIEW" in gc_text
+                if needs_review:
+                    st.warning("⚠️ Grounding check flagged claims — review the letter before sending.")
+                with st.expander(f"🔍 Grounding check: {'REVIEW' if needs_review else 'PASS'}"):
+                    st.markdown(gc_text)
+            ans_text = read_material(app.materials_path, "answers.md")
+            if ans_text:
+                with st.expander("📝 Application answers (copy-paste for forms)"):
+                    st.markdown(ans_text)
         elif sc and sc.tier in ("Strong Fit", "Worth Reviewing"):
             st.info("Materials not yet generated for this job.")
             if st.button("⚡ Generate materials now", key="gen_cl", type="primary"):

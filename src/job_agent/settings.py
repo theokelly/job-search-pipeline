@@ -21,6 +21,8 @@ _DEFAULT_MODELS: dict[str, Any] = {
         "Worth Reviewing": "claude-sonnet-4-6",
     },
     "cover_letter_default": "claude-sonnet-4-6",
+    "application_answers": "claude-haiku-4-5-20251001",
+    "truthfulness_check": "claude-haiku-4-5-20251001",
 }
 
 _DEFAULT_TRUNCATION: dict[str, int] = {
@@ -33,6 +35,9 @@ _DEFAULT_TRUNCATION: dict[str, int] = {
     "cover_letter_resume_chars": 3000,
     "cover_letter_examples_chars": 5000,
     "resume_rec_resume_chars": 4000,
+    "answers_jd_chars": 3000,
+    "answers_resume_chars": 3000,
+    "truthfulness_resume_chars": 4000,
 }
 
 _DEFAULT_PIPELINE: dict[str, Any] = {
@@ -62,7 +67,8 @@ def _section(profile: dict, key: str, defaults: dict) -> dict:
 def model_for(profile: dict, task: str, tier: str | None = None) -> str:
     """Return the model name for a given task.
 
-    task: one of 'prescreen', 'score', 'resume_recommendation', 'cover_letter'.
+    task: one of 'prescreen', 'score', 'resume_recommendation', 'cover_letter',
+    'application_answers', 'truthfulness_check'.
     For 'cover_letter', `tier` selects via models.cover_letter_by_tier with
     fallback to models.cover_letter_default.
     """

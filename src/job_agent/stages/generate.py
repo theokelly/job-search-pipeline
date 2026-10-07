@@ -1,8 +1,11 @@
 """Generation stage: cover letter + resume recommendation (Opus).
 
-Runs for Strong Fit by default (configurable tiers). Cluster-aware: generates
-once per cluster for the canonical posting and links sibling Applications
-to the same materials directory.
+Runs for Strong Fit by default (configurable tiers). Also produces cheap
+Haiku assists per application: pre-drafted application-form answers
+(`answers.md`) and a grounding check on the cover letter
+(`grounding_check.md`). Cluster-aware: generates once per cluster for the
+canonical posting and links sibling Applications to the same materials
+directory.
 """
 from pathlib import Path
 from typing import Callable
@@ -25,6 +28,8 @@ def run_generate(
     from ..config import load_profile, load_profile_files
     from ..generation.cover_letter import generate_cover_letter
     from ..generation.resume_recommendation import generate_resume_recommendation
+    from ..generation.application_answers import generate_application_answers
+    from ..generation.truthfulness import check_grounding
     from ..output import write_outputs
     from ..tailor import budgets_from_markdown
     from sqlmodel import select
@@ -123,7 +128,19 @@ def run_generate(
                 resume_rec = generate_resume_recommendation(
                     canonical, canonical_score, resume_text, profile,
                     budgets_from_markdown(resume_text))
-                out_dir = write_outputs(canonical, canonical_score, cover_letter, resume_rec, user_slug=user_slug)
+                # Cheap Haiku assists: pre-drafted form answers + grounding
+                # check on the letter. Neither blocks the pipeline on failure.
+                try:
+                    answers = generate_application_answers(canonical, profile, resume_text)
+                except Exception as e:
+                    echo(f"  [answers] {canonical.company} — {canonical.title}: {e}")
+                    answers = "# Application answers\n\nGeneration failed — fill in manually.\n"
+                grounding = check_grounding(
+                    canonical, canonical_score, cover_letter, resume_text,
+                    profile_files.get("accomplishments/starls.md", ""), profile)
+                out_dir = write_outputs(canonical, canonical_score, cover_letter, resume_rec,
+                                        application_answers=answers, grounding_check=grounding,
+                                        user_slug=user_slug)
                 generated_clusters += 1
 
                 # One Application per sibling, all pointing at the canonical's materials dir

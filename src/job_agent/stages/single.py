@@ -40,6 +40,8 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
     from ..config import load_profile, load_profile_files
     from ..generation.cover_letter import generate_cover_letter
     from ..generation.resume_recommendation import generate_resume_recommendation
+    from ..generation.application_answers import generate_application_answers
+    from ..generation.truthfulness import check_grounding
     from ..output import write_outputs
     from ..tailor import budgets_from_markdown
     from sqlmodel import select
@@ -63,7 +65,16 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
         cover_letter = generate_cover_letter(job, s, profile_files, profile)
         resume_rec = generate_resume_recommendation(
             job, s, resume_text, profile, budgets_from_markdown(resume_text))
-        out_dir = write_outputs(job, s, cover_letter, resume_rec, user_slug=user_slug)
+        try:
+            answers = generate_application_answers(job, profile, resume_text)
+        except Exception:
+            answers = "# Application answers\n\nGeneration failed — fill in manually.\n"
+        grounding = check_grounding(
+            job, s, cover_letter, resume_text,
+            profile_files.get("accomplishments/starls.md", ""), profile)
+        out_dir = write_outputs(job, s, cover_letter, resume_rec,
+                                application_answers=answers, grounding_check=grounding,
+                                user_slug=user_slug)
         app = Application(job_id=job_id, user_id=user_id, materials_path=str(out_dir))
         session.add(app)
         session.commit()

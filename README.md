@@ -69,6 +69,8 @@ Each application lives in `outputs/theo/{date}_{company}_{role}/`:
 | `job.md` | Source, URL, scores, and JD preview — the quick-glance summary |
 | `cover_letter.md` | Ready-to-use draft; make minor edits then paste |
 | `resume_recommendation.md` | Which version to use + 1-3 surgical text edits |
+| `answers.md` | Pre-drafted application-form answers (work auth, salary, notice…); `TODO` marks anything the profile can't answer |
+| `grounding_check.md` | Haiku verification that the cover letter only claims things your materials support; `REVIEW` flags need a human look |
 | `score.json` | Tier, scores, rationale, gaps, positioning notes |
 
 ---
@@ -148,9 +150,25 @@ Features:
 
 ## Adding new companies
 
-Edit `profile/theo.yaml` under `target_companies`. Set `greenhouse_token` or `lever_slug` if known. Leave both `null` for companies on Workday/own ATS — they'll be covered by Gmail alerts.
+Edit `profile/theo.yaml` under `target_companies`. Set `greenhouse_token`, `lever_slug`, or `ashby_board` if known. Leave all `null` for companies on Workday/own ATS — they'll be covered by Gmail alerts.
 
-To find a Greenhouse token: check `https://boards.greenhouse.io/{token}`. To find a Lever slug: check `https://jobs.lever.co/{slug}`.
+To find a Greenhouse token: check `https://boards.greenhouse.io/{token}`. To find a Lever slug: check `https://jobs.lever.co/{slug}`. To find an Ashby board: check `https://jobs.ashbyhq.com/{board}`.
+
+---
+
+## Application answers
+
+Each generated application includes `answers.md`: pre-drafted responses to the standard application-form questions (work authorization, sponsorship, location, salary, notice period…) plus any screening questions extracted from the JD. Answers come from the `application_answers:` block in `theo.yaml` plus facts the pipeline already knows (Amsterdam location, EU citizenship). Anything unanswerable is marked `**TODO — fill in before submitting**`.
+
+```yaml
+application_answers:
+  salary_expectation: "EUR 115k-130k base"   # fill in your vetted numbers
+  notice_period: "Available immediately"
+  earliest_start_date: "November 2026"
+  languages: "English (native); Greek (conversational)"
+```
+
+All keys are optional — unset ones become TODO markers, never invented values.
 
 ---
 
@@ -213,6 +231,7 @@ Writes `resume_tailored.pptx` next to the recommendation and flags any edit that
 | Score 1 job | Sonnet 4.6 | ~$0.005 |
 | Generate 1 cover letter (Strong Fit) | Opus 4.7 | ~$0.07 |
 | Generate 1 cover letter (Worth Reviewing, on demand) | Sonnet 4.6 | ~$0.04 |
+| Application answers + grounding check (per generation) | Haiku 4.5 | ~$0.01 |
 
 Prescreen and scoring run through the Batches API by default (50% discount on input + output). Note: prompt-cache hits inside a batch are best-effort and usually **miss** (requests process concurrently), so the batch discount — not caching — is the main saving on the batched path. Caching does help the synchronous paths (UI "score now", `--no-batch`) when calls land within the 5-minute cache TTL.
 

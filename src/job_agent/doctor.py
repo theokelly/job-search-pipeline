@@ -164,6 +164,20 @@ def check_resume_sync(report: Report) -> None:
                        "Extract one with scripts/extract_resume.py")
 
 
+def check_application_answers(report: Report, profile: dict | None) -> None:
+    """The application_answers block is optional, but an empty one means every
+generated answers.md will be full of TODO markers. Nudge, don't fail."""
+    answers = (profile or {}).get("application_answers") or {}
+    filled = [k for k, v in answers.items() if v]
+    if not filled:
+        report.add("warning", "application-answers",
+                   "application_answers block empty or missing in theo.yaml",
+                   "Add salary_expectation, notice_period, etc. — see README")
+    else:
+        report.add("info", "application-answers",
+                   f"{len(filled)} application answer(s) configured")
+
+
 def check_drive(report: Report, profile: dict | None) -> None:
     """Drive sync status: configured? credentials present? files mapped?"""
     sync_cfg = (profile or {}).get("profile_sync")
@@ -197,6 +211,7 @@ def run_doctor() -> int:
     check_generation_files(report)
     check_resume_sync(report)
     check_drive(report, profile)
+    check_application_answers(report, profile)
 
     print("\n=== job-agent doctor ===")
     for issue in report.issues:

@@ -10,6 +10,7 @@ _SOURCE_LABELS = {
     "greenhouse_api": "Greenhouse ATS",
     "lever": "Lever ATS",
     "lever_api": "Lever ATS",
+    "ashby_api": "Ashby ATS",
     "linkedin": "LinkedIn (email alert)",
     "linkedin_search": "LinkedIn (direct search)",
     "indeed": "Indeed (email alert)",
@@ -76,6 +77,8 @@ def write_outputs(
     score: Score,
     cover_letter: str,
     resume_recommendation: str,
+    application_answers: str = "",
+    grounding_check: str = "",
     user_slug: str = "theo",
     base_dir: str = "outputs",
 ) -> Path:
@@ -88,6 +91,10 @@ def write_outputs(
     (out_dir / "job.md").write_text(_job_card(job, score, generated_at=date_str))
     (out_dir / "cover_letter.md").write_text(cover_letter)
     (out_dir / "resume_recommendation.md").write_text(resume_recommendation)
+    if application_answers:
+        (out_dir / "answers.md").write_text(application_answers)
+    if grounding_check:
+        (out_dir / "grounding_check.md").write_text(grounding_check)
     (out_dir / "score.json").write_text(json.dumps({
         "tier": score.tier,
         "skill_fit": score.skill_fit,
