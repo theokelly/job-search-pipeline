@@ -30,7 +30,7 @@ def run_generate(
 
     target_tiers = [t.strip() for t in tiers.split(",")]
     profile = load_profile(profile_path)
-    profile_files = load_profile_files()
+    profile_files = load_profile_files(profile=profile)
 
     init_db()
     outputs: list = []

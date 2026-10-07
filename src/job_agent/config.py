@@ -45,12 +45,52 @@ GENERATION_PROFILE_FILES: tuple[str, ...] = (
 )
 
 
-def load_profile_files(rel_paths: tuple[str, ...] | list[str] = GENERATION_PROFILE_FILES) -> dict[str, str]:
+def _maybe_sync_profile(profile: dict) -> None:
+    """Auto-sync Drive files before loading, when profile_sync.sync_on_load
+    is true. Skips if a sync ran in the last 15 minutes (staleness guard).
+    Never breaks the caller: any failure warns and local files are used."""
+    from datetime import datetime, timedelta, timezone
+
+    cfg = profile.get("profile_sync") or {}
+    if not cfg.get("sync_on_load"):
+        return
+    stamp = Path("data/.drive_sync_last")
+    try:
+        last = float(stamp.read_text().strip())
+        age = datetime.now(timezone.utc).timestamp() - last
+        if age < timedelta(minutes=15).total_seconds():
+            return
+    except (OSError, ValueError):
+        pass
+    try:
+        from .drive_sync import sync_profile_files
+        results = sync_profile_files(profile, dry_run=False)
+    except Exception as e:
+        print(f"[profile] Drive auto-sync failed ({e}); using local files",
+              file=sys.stderr)
+        return
+    try:
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(str(datetime.now(timezone.utc).timestamp()))
+    except OSError:
+        pass
+    updated = [r.local_path for r in results if r.status == "updated"]
+    if updated:
+        print(f"[profile] synced from Drive: {', '.join(updated)}", file=sys.stderr)
+
+
+def load_profile_files(rel_paths: tuple[str, ...] | list[str] = GENERATION_PROFILE_FILES,
+                       profile: dict | None = None) -> dict[str, str]:
     """Load profile files into a dict keyed by their path under profile/.
 
     Missing files map to empty strings so generation can degrade gracefully if a
     resume version or accomplishments file is not yet populated.
+
+    When profile is given and profile_sync.sync_on_load is true, Drive files
+    are synced first (failures warn, never raise).
     """
+    if profile is not None:
+        _maybe_sync_profile(profile)
     out: dict[str, str] = {}
     for rel_path in rel_paths:
         key = rel_path.replace("profile/", "")
@@ -216,6 +256,15 @@ _PROFILE_SPEC: dict[str, object] = {
         "persona": str,
         "geography_rules": str,
         "reject_signals": [str],
+    },
+    "profile_sync": {
+        "credentials_file": str,
+        "client_secrets_file": (str, type(None)),
+        "sync_on_load": bool,
+        "files": [{
+            "drive_id": str,
+            "local_path": str,
+        }],
     },
 }
 

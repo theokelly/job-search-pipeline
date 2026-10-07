@@ -44,7 +44,7 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
     from sqlmodel import select
 
     profile = load_profile(profile_path)
-    profile_files = load_profile_files()
+    profile_files = load_profile_files(profile=profile)
 
     init_db()
     with get_session() as session:

@@ -165,13 +165,25 @@ def check_resume_sync(report: Report) -> None:
 
 
 def check_drive(report: Report, profile: dict | None) -> None:
-    """Placeholder until Phase C1 (Drive sync) lands."""
+    """Drive sync status: configured? credentials present? files mapped?"""
     sync_cfg = (profile or {}).get("profile_sync")
     if not sync_cfg:
-        report.add("info", "drive", "Drive sync not configured (Phase C1)")
+        report.add("info", "drive", "Drive sync not configured (add profile_sync to theo.yaml)")
         return
-    report.add("warning", "drive",
-               "profile_sync is configured but the Drive check is not implemented yet")
+    creds_file = sync_cfg.get("credentials_file", "")
+    if creds_file and Path(creds_file).exists():
+        report.add("info", "drive", f"Drive credentials present ({creds_file})")
+    else:
+        report.add("warning", "drive",
+                   f"Drive credentials not found: {creds_file or '(not set)'}",
+                   "Run: job-agent drive-auth")
+    files = sync_cfg.get("files") or []
+    missing_local = [f["local_path"] for f in files
+                     if isinstance(f, dict) and not Path(f.get("local_path", "")).exists()]
+    for p in missing_local:
+        report.add("warning", "drive", f"Mapped local file missing: {p}",
+                   "Run: job-agent sync-profile --apply to fetch it from Drive")
+    report.add("info", "drive", f"{len(files)} file(s) mapped for Drive sync")
 
 
 _LEVEL_LABEL = {"error": "ERROR", "warning": "warn", "info": "ok"}

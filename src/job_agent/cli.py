@@ -312,5 +312,67 @@ def doctor():
     raise typer.Exit(code=run_doctor())
 
 
+@app.command(name="drive-auth")
+def drive_auth():
+    """One-time Google Drive OAuth setup.
+
+    The container has no browser, so this prints instructions: run
+    scripts/drive_auth_local.py on your Mac, where the browser lives.
+    """
+    _bootstrap()
+    from .config import load_profile
+    from .drive_sync import DriveSyncError, _sync_config
+    try:
+        cfg = _sync_config(load_profile("profile/theo.yaml"))
+    except DriveSyncError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+    typer.echo(
+        "OAuth needs a browser, so run this on your Mac (not in the container):\n"
+        "\n"
+        "    pip install google-auth-oauthlib google-auth\n"
+        "    python3 scripts/drive_auth_local.py\n"
+        "\n"
+        f"It reads {cfg.get('client_secrets_file')} and writes "
+        f"{cfg.get('credentials_file')}."
+    )
+
+
+@app.command(name="sync-profile")
+def sync_profile(
+    apply: bool = typer.Option(False, "--apply", help="Write Drive content to local files (default: dry-run, show diff only)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show full diffs (default: compact summary only)"),
+    file: Optional[str] = typer.Option(None, "--file", help="Only process the mapped file whose path contains this text, e.g. --file elevator_pitch"),
+):
+    """Sync profile source files from Google Drive (see profile_sync in theo.yaml). Dry-run by default."""
+    _bootstrap()
+    from .config import load_profile
+    from .drive_sync import sync_profile_files, DriveSyncError
+    try:
+        results = sync_profile_files(load_profile("profile/theo.yaml"), dry_run=not apply, only=file)
+    except DriveSyncError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    for r in results:
+        if r.status == "in-sync":
+            typer.echo(f"[ok] {r.local_path}: in sync with Drive ({r.drive_name})")
+        elif r.status in ("would-update", "updated"):
+            verb = "would update" if r.status == "would-update" else "updated"
+            typer.echo(
+                f"[diff] {r.local_path} {verb} from Drive "
+                f"(+{r.added}/-{r.removed} lines, Drive modified {r.drive_modified})"
+            )
+            if verbose and r.diff:
+                typer.echo(r.diff)
+        elif r.status == "missing-local":
+            typer.echo(f"[new] {r.local_path}: does not exist locally" + (" — wrote from Drive" if apply else " — dry-run, not written"))
+        else:
+            typer.echo(f"[error] {r.local_path}: {r.error}")
+    if not apply and any(r.status in ("would-update", "missing-local") for r in results):
+        typer.echo("\nDry-run only — nothing written. Re-run with --apply to update local files,")
+        typer.echo("or add --verbose to see the full diffs.")
+
+
 if __name__ == "__main__":
     app()
