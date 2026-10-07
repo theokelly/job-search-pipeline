@@ -187,6 +187,7 @@ _PROFILE_SPEC: dict[str, object] = {
         "greenhouse_token": (str, type(None)),
         "lever_slug": (str, type(None)),
         "ashby_board": (str, type(None)),
+        "workday_board": (str, type(None)),
         "priority": (str, type(None)),
         "size": (str, type(None)),
         "notes": (str, type(None)),

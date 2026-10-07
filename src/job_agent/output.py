@@ -11,6 +11,7 @@ _SOURCE_LABELS = {
     "lever": "Lever ATS",
     "lever_api": "Lever ATS",
     "ashby_api": "Ashby ATS",
+    "workday_api": "Workday",
     "linkedin": "LinkedIn (email alert)",
     "linkedin_search": "LinkedIn (direct search)",
     "indeed": "Indeed (email alert)",

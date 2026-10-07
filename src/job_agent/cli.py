@@ -16,6 +16,17 @@ def _bootstrap() -> None:
     load_dotenv(".env", override=False)
 
 
+def _print_discover_summary(counts: dict, dry_run: bool, indent: str = "") -> None:
+    """Final discover line plus an error recap, so failures aren't lost in long logs."""
+    typer.echo(
+        f"{indent}Discover: {counts['found']} found, {counts['passed']} passed filter"
+        + (f", {counts['new']} new, {counts['updated']} updated" if not dry_run else "")
+        + (f", {counts.get('errors', 0)} errors" if counts.get('errors') else ", no errors")
+    )
+    for detail in counts.get("error_details", []):
+        typer.echo(f"{indent}  ! {detail}")
+
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -29,7 +40,7 @@ def discover(
     linkedin: bool = typer.Option(False, "--linkedin", help="Search LinkedIn via guest API (slower, fetches full JDs)"),
     refetch_jds: bool = typer.Option(False, "--refetch-jds", help="Re-fetch JDs for jobs already in the DB (LinkedIn + email). Use after fixing a fetch bug."),
 ):
-    """Fetch new job postings from Greenhouse and Lever APIs, and optionally Gmail alerts or LinkedIn search."""
+    """Fetch new job postings from ATS APIs (Greenhouse, Lever, Ashby, Workday), and optionally Gmail alerts or LinkedIn search."""
     _bootstrap()
     from .pipeline import run_discover
     counts, results = run_discover(
@@ -48,10 +59,8 @@ def discover(
             else:
                 typer.echo(f"  SKIP {job.company} — {job.title} ({reason})")
 
-    typer.echo(
-        f"\nDiscover: {counts['found']} found, {counts['passed']} passed filter"
-        + (f", {counts['new']} new, {counts['updated']} updated" if not dry_run else "")
-    )
+    typer.echo()
+    _print_discover_summary(counts, dry_run)
 
 
 @app.command()
@@ -152,10 +161,7 @@ def run(
         dry_run=dry_run, include_linkedin=linkedin, include_email=email,
         email_days=email_days, refetch_jds=refetch_jds,
     )
-    typer.echo(
-        f"  {counts['found']} found, {counts['passed']} passed filter"
-        + (f", {counts['new']} new, {counts['updated']} updated" if not dry_run else "")
-    )
+    _print_discover_summary(counts, dry_run, indent="  ")
 
     if dry_run:
         typer.echo("\n[dry-run] Skipping score + generate steps.")

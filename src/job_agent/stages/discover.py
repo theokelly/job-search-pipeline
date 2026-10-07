@@ -1,8 +1,8 @@
 """Discovery stage: fetch new postings from all sources, pre-filter, upsert.
 
-Sources: LinkedIn guest API, Gmail alert ingestion, Greenhouse + Lever + Ashby
-ATS APIs. Rule-based pre-filter runs before anything is saved; JD backfill
-fills in descriptions for LinkedIn jobs missing them.
+Sources: LinkedIn guest API, Gmail alert ingestion, Greenhouse + Lever +
+Ashby + Workday ATS APIs. Rule-based pre-filter runs before anything is
+saved; JD backfill fills in descriptions for LinkedIn jobs missing them.
 
 Imports inside functions are lazy so that `job-agent --help` and
 short-running commands don't pay the full import cost.
@@ -37,6 +37,7 @@ def run_discover(
     from ..discovery.greenhouse import fetch_jobs as gh_fetch
     from ..discovery.lever import fetch_jobs as lever_fetch
     from ..discovery.ashby import fetch_jobs as ashby_fetch
+    from ..discovery.workday import fetch_jobs as wd_fetch
     from ..filter import pre_filter
     from sqlmodel import select as sql_select
 
@@ -47,8 +48,16 @@ def run_discover(
     if priority:
         companies = [c for c in companies if c.get("priority") == priority]
 
-    counts = {"found": 0, "passed": 0, "new": 0, "updated": 0, "skipped": 0}
+    counts = {"found": 0, "passed": 0, "new": 0, "updated": 0, "skipped": 0, "errors": 0}
     results: list = []
+    error_details: list[str] = []
+
+    def _note_error(context: str, e: Exception) -> None:
+        """Echo a fetch failure now AND remember it for the final summary."""
+        detail = f"[{context}] {e}"
+        echo(f"  {detail}")
+        counts["errors"] += 1
+        error_details.append(detail)
 
     # Build known_ids set once — shared by LinkedIn and email paths
     known_ids: set[str] = set()
@@ -87,7 +96,7 @@ def run_discover(
                         counts["passed"] += 1
                         results.append(("keep", job, None))
         except Exception as e:
-            echo(f"  [linkedin] error — {e}")
+            _note_error("linkedin", e)
 
     # Email alert ingestion (only when Gmail is configured)
     if include_email:
@@ -109,17 +118,18 @@ def run_discover(
                     counts["passed"] += 1
                     results.append(("keep", job, None))
         except EnvironmentError as e:
-            echo(f"  [email] skipped — {e}")
+            _note_error("email (skipped)", e)
         except Exception as e:
-            echo(f"  [email] error — {e}")
+            _note_error("email", e)
 
     for company in companies:
         name = company.get("name", "")
         gh_token = company.get("greenhouse_token")
         lever_slug = company.get("lever_slug")
         ashby_board = company.get("ashby_board")
+        workday_board = company.get("workday_board")
 
-        if not gh_token and not lever_slug and not ashby_board:
+        if not gh_token and not lever_slug and not ashby_board and not workday_board:
             continue
 
         jobs = []
@@ -127,17 +137,22 @@ def run_discover(
             try:
                 jobs += gh_fetch(name, gh_token)
             except Exception as e:
-                echo(f"  [greenhouse] {name}: {e}")
+                _note_error(f"greenhouse {name}", e)
         if lever_slug:
             try:
                 jobs += lever_fetch(name, lever_slug)
             except Exception as e:
-                echo(f"  [lever] {name}: {e}")
+                _note_error(f"lever {name}", e)
         if ashby_board:
             try:
                 jobs += ashby_fetch(name, ashby_board)
             except Exception as e:
-                echo(f"  [ashby] {name}: {e}")
+                _note_error(f"ashby {name}", e)
+        if workday_board:
+            try:
+                jobs += wd_fetch(name, workday_board)
+            except Exception as e:
+                _note_error(f"workday {name}", e)
 
         for job in jobs:
             counts["found"] += 1
@@ -169,6 +184,7 @@ def run_discover(
                     session.commit()
                     echo(f"  [linkedin] backfilled JDs for {backfilled} jobs")
             except Exception as e:
-                echo(f"  [linkedin] backfill error — {e}")
+                _note_error("linkedin backfill", e)
 
+    counts["error_details"] = error_details
     return counts, results

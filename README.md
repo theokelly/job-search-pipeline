@@ -150,9 +150,9 @@ Features:
 
 ## Adding new companies
 
-Edit `profile/theo.yaml` under `target_companies`. Set `greenhouse_token`, `lever_slug`, or `ashby_board` if known. Leave all `null` for companies on Workday/own ATS — they'll be covered by Gmail alerts.
+Edit `profile/theo.yaml` under `target_companies`. Set `greenhouse_token`, `lever_slug`, `ashby_board`, or `workday_board` if known. Leave all `null` for companies on other ATSs — they'll be covered by Gmail alerts.
 
-To find a Greenhouse token: check `https://boards.greenhouse.io/{token}`. To find a Lever slug: check `https://jobs.lever.co/{slug}`. To find an Ashby board: check `https://jobs.ashbyhq.com/{board}`.
+To find a Greenhouse token: check `https://boards.greenhouse.io/{token}`. To find a Lever slug: check `https://jobs.lever.co/{slug}`. To find an Ashby board: check `https://jobs.ashbyhq.com/{board}`. For Workday, find the company's `*.myworkdayjobs.com` site and set `workday_board: "{host}/{site}"` (e.g. `philips.wd3.myworkdayjobs.com/jobs-and-careers`) — the pipeline uses the public CXS JSON API, no auth needed.
 
 ---
 
