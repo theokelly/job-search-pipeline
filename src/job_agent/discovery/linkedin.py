@@ -13,7 +13,7 @@ import time
 import urllib.request
 import urllib.parse
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from bs4 import BeautifulSoup
@@ -321,7 +321,7 @@ def fetch_jobs(
 
     Returns Job records with description_raw populated.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     all_cards: list[dict] = []
 
     total_queries = len(search_queries)

@@ -52,8 +52,8 @@ def build_cover_letter_messages(job: Job, score: Score, profile_files: dict, pro
 ## Resume — {score.recommended_resume_version} version
 {resume_text[:resume_chars]}"""
 
-    from datetime import datetime
-    today = datetime.utcnow().strftime("%B %Y")
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%B %Y")
 
     job_prompt = f"""## Target role
 Company: {job.company}

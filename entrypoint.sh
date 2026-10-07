@@ -8,10 +8,10 @@ if [ ! -d ".venv" ]; then
     python3 -m venv .venv
 fi
 
-# Install project if not already installed
+# Install project if not already installed (with dev extras for pytest-asyncio)
 if ! .venv/bin/python -c "import job_agent" 2>/dev/null; then
     echo "[setup] Installing project dependencies..."
-    .venv/bin/pip install -e . -q
+    .venv/bin/pip install -e ".[dev]" -q
 fi
 
 # Activate venv for the interactive session

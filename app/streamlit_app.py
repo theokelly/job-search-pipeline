@@ -6,7 +6,7 @@ Run with:
 """
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import altair as alt
@@ -492,7 +492,7 @@ def set_app_status(job_id: str, user_id: int, status: str):
         sibling_ids = [j.id for j in all_jobs if clustering.cluster_key(j) == target_key]
 
         new_status = status if status != "clear" else None
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         for jid in sibling_ids:
             meta = get_or_create_meta(s, jid, user_id)
             meta.app_status = new_status
@@ -596,7 +596,7 @@ def render_sidebar(df: pd.DataFrame):
             if st.session_state.filter_since == "custom":
                 st.session_state.filter_since_date = st.date_input(
                     "Since (first seen)",
-                    value=st.session_state.filter_since_date or (datetime.utcnow() - timedelta(days=7)).date(),
+                    value=st.session_state.filter_since_date or (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)).date(),
                 )
 
             if any([
@@ -646,7 +646,7 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     # "New since" filter — based on first_seen
     since = st.session_state.filter_since
     if since != "all":
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).replace(tzinfo=None).date()
         if since == "today":
             cutoff = today
         elif since == "week":
@@ -911,7 +911,7 @@ def _save_manual_job(company: str, title: str, location: str, description: str, 
     title = (title or "Unknown Role").strip()
     location = (location or "").strip()
     job_db_id = compute_job_id(company, title, location)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     job = Job(
         id=job_db_id,
         source="manual",
@@ -1299,7 +1299,7 @@ def render_stats(df: pd.DataFrame):
     col3.metric("Strong Fit", len(strong))
     applied = df[df["app_status"].isin(["applied", "interviewing", "offer"])]
     col4.metric("In Progress", len(applied))
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).replace(tzinfo=None).date()
     new_today = df[df["first_seen"].apply(lambda d: d is not None and d >= today)]
     col5.metric("New Today", len(new_today))
 

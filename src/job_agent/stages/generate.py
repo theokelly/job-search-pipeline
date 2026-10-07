@@ -9,10 +9,11 @@ from typing import Callable
 
 from ._common import (
     PROFILE_PATH_DEFAULT, _default_echo, init_db, get_session,
-    Job, Score, Application, User, clustering,
+    Job, Score, Application, User, clustering, logged_run,
 )
 
 
+@logged_run("generate")
 def run_generate(
     user_slug: str = "theo",
     tiers: str = "Strong Fit",

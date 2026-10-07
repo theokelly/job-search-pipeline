@@ -3,11 +3,12 @@
 These keep the pool honest between discovery runs. Only `active` jobs flow
 through scoring, generation, and the UI.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
 from ._common import (
     PROFILE_PATH_DEFAULT, _default_echo, init_db, get_session, Job, settings,
+    logged_run,
 )
 
 
@@ -37,6 +38,7 @@ class _RateLimiter:
             _time.sleep(sleep_for)
 
 
+@logged_run("prune_closed")
 def run_prune_closed(
     limit: Optional[int] = None,
     max_workers: int = 8,
@@ -70,7 +72,7 @@ def run_prune_closed(
     from sqlmodel import select
 
     init_db()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     fresh_cutoff = now - timedelta(hours=skip_fresh_hours)
     recheck_cutoff = now - timedelta(hours=recheck_after_hours)
 
@@ -125,6 +127,7 @@ def run_prune_closed(
     return pruned
 
 
+@logged_run("sweep")
 def run_sweep(
     days: Optional[int] = None,
     profile_path: str = PROFILE_PATH_DEFAULT,
@@ -142,7 +145,7 @@ def run_sweep(
         days = int(settings.pipeline_config(profile)["expire_after_days"])
 
     init_db()
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     expired = 0
     with get_session() as session:
         stale = session.exec(

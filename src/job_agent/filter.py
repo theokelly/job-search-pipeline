@@ -19,9 +19,10 @@ def pre_filter(job: Job, profile: dict) -> tuple[bool, str]:
         if term.lower() in text:
             return False, f"dealbreaker: '{term}'"
 
-    # Title-only role-type filters
+    # Title-only role-type filters. Word-boundary match so short terms like
+    # "swe" don't substring-match e.g. "Sweden" in titles.
     for term in profile.get("title_filter_terms", []):
-        if term.lower() in title:
+        if re.search(rf"(?<!\w){re.escape(term.lower())}(?!\w)", title):
             return False, f"role type: '{term}'"
 
     # Location check

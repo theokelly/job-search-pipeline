@@ -3,7 +3,7 @@
 Synchronous paths (no batching): score_one always inserts a fresh Score row;
 generate_one writes materials and an Application row for one job.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ._common import (
@@ -28,7 +28,7 @@ def score_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEFAUL
         # Mark prescreen as manual_override so it bypasses future prescreen passes
         meta = get_or_create_meta(session, job_id, user_id)
         meta.prescreen_status = "manual_override"
-        meta.updated_at = datetime.utcnow()
+        meta.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         session.add(meta)
         session.commit()
         session.refresh(s)

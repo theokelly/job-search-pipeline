@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 import anthropic
 from ..db import Job, Score
 from .. import settings
@@ -40,5 +40,5 @@ def _score_from_tool_input(job: Job, user_id: int, data: dict) -> Score:
         positioning_notes=data["positioning_notes"],
         rationale=data["rationale"],
         raw_response=raw,
-        scored_at=datetime.utcnow(),
+        scored_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )

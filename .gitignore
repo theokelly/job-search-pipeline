@@ -19,6 +19,8 @@ tests/fixtures/
 data/
 outputs/
 backups/
+# Stale public fork (has its own .git + real .env inside) — never commit
+job-application-pipeline-public/
 *.sqlite
 *.sqlite-journal
 *.db

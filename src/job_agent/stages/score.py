@@ -5,16 +5,17 @@ decisions and scores replicate to siblings. Supports batch mode (Batches
 API, 50% discount) with sync fallback, plus detached batch resume via
 fetch_score_batch / fetch_prescreen_batch.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from ._common import (
     PROFILE_PATH_DEFAULT, NARRATIVE_PATH, _default_echo, _replicate_score,
     init_db, get_session, get_or_create_meta, Job, Score, User, UserJobMeta,
-    settings, clustering,
+    settings, clustering, logged_run,
 )
 
 
+@logged_run("score")
 def run_score(
     user_slug: str = "theo",
     limit: Optional[int] = None,
@@ -283,7 +284,7 @@ def _prescreen_filter(
             meta = get_or_create_meta(session, job.id, user_id)
             meta.prescreen_status = "approved" if approved else "rejected"
             meta.prescreen_reason = reason
-            meta.updated_at = datetime.utcnow()
+            meta.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             session.add(meta)
             if approved:
                 approved_jobs.append(job)
@@ -331,7 +332,6 @@ def _score_batch(
         return scored
     except BatchTimeout as e:
         echo(f"  [score] batch timed out. Resume with: job-agent batch-fetch {e.batch_id} --kind score")
-        echo(f"  [score] (note: batch-fetch will not auto-replicate to siblings; rerun `job-agent score` after fetch to populate)")
         return []
     except Exception as e:
         echo(f"  [score] batch error, falling back to sync: {e}")
@@ -355,7 +355,11 @@ def fetch_score_batch(
     profile_path: str = PROFILE_PATH_DEFAULT,
     echo: Callable[[str], None] = _default_echo,
 ) -> int:
-    """Fetch results from a previously-submitted score batch. Returns # scored."""
+    """Fetch results from a previously-submitted score batch. Returns # scored.
+
+    Replicates each canonical's score to its cluster siblings, mirroring the
+    sync path (previously batch-fetch left siblings unscored).
+    """
     from ..config import load_profile
     from ..batches import iter_results
     from ..scoring.score import _score_from_tool_input
@@ -364,6 +368,7 @@ def fetch_score_batch(
     profile = load_profile(profile_path)
     init_db()
     saved = 0
+    scored: list[tuple[Job, Score]] = []
     with get_session() as session:
         db_user = session.exec(select(User).where(User.slug == user_slug)).first()
         if not db_user:
@@ -385,7 +390,23 @@ def fetch_score_batch(
                 continue
             score = _score_from_tool_input(job, db_user.id, tool_use.input)
             session.add(score)
+            scored.append((job, score))
             saved += 1
+        if scored:
+            all_jobs = session.exec(select(Job)).all()
+            by_key: dict[str, list[Job]] = {}
+            for j in all_jobs:
+                by_key.setdefault(clustering.cluster_key(j), []).append(j)
+            scored_ids = {job.id for job, _ in scored}
+            replicated = 0
+            for job, score in scored:
+                for sib in by_key.get(clustering.cluster_key(job), []):
+                    if sib.id not in scored_ids:
+                        session.add(_replicate_score(score, sib.id))
+                        scored_ids.add(sib.id)
+                        replicated += 1
+            if replicated:
+                echo(f"  [batch-fetch] replicated scores to {replicated} cluster sibling(s)")
         session.commit()
     echo(f"  [batch-fetch] saved {saved} scores from {batch_id}")
     return saved
@@ -426,7 +447,7 @@ def fetch_prescreen_batch(
             meta = get_or_create_meta(session, job_id, db_user.id)
             meta.prescreen_status = "approved" if approved else "rejected"
             meta.prescreen_reason = reason
-            meta.updated_at = datetime.utcnow()
+            meta.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             session.add(meta)
             saved += 1
         session.commit()

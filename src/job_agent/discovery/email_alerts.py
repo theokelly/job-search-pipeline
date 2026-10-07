@@ -24,7 +24,7 @@ import re
 import html as _html_lib
 import urllib.request
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from ..db import Job, job_id as make_job_id
@@ -298,13 +298,13 @@ def _fetch_from_label(
         return []
 
     from datetime import timedelta
-    since_date = (datetime.utcnow() - timedelta(days=since_days)).strftime("%d-%b-%Y")
+    since_date = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=since_days)).strftime("%d-%b-%Y")
     _, data = conn.search(None, f'SINCE {since_date}')
     if not data[0]:
         return []
 
     jobs: list[Job] = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     for num in data[0].split():
         _, raw_data = conn.fetch(num, "(RFC822)")
         msg = _email_lib.message_from_bytes(raw_data[0][1])

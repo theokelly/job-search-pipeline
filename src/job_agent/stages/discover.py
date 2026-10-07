@@ -11,9 +11,11 @@ from typing import Callable, Optional
 
 from ._common import (
     PROFILE_PATH_DEFAULT, _default_echo, init_db, get_session, upsert_job, Job,
+    logged_run,
 )
 
 
+@logged_run("discover")
 def run_discover(
     dry_run: bool = False,
     priority: Optional[str] = None,

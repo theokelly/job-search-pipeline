@@ -1,7 +1,7 @@
 import json
 import re
 import html as _html
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from .db import Job, Score
 
@@ -79,7 +79,7 @@ def write_outputs(
     user_slug: str = "theo",
     base_dir: str = "outputs",
 ) -> Path:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     date_str = now.strftime("%Y-%m-%d")
     folder_name = f"{date_str}_{slugify(job.company)}_{slugify(job.title)}"
     out_dir = Path(base_dir) / user_slug / folder_name

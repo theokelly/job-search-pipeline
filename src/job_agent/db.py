@@ -1,5 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+
+
+def _utcnow() -> datetime:
+    """Current UTC time as a naive datetime (matches naive SQLite storage)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 from typing import Optional
 from sqlmodel import SQLModel, Field, create_engine, Session
 import hashlib
@@ -24,8 +29,8 @@ class Job(SQLModel, table=True):
     location: str
     url: str
     description_raw: str = Field(default="")
-    first_seen: datetime = Field(default_factory=datetime.utcnow)
-    last_seen: datetime = Field(default_factory=datetime.utcnow)
+    first_seen: datetime = Field(default_factory=_utcnow)
+    last_seen: datetime = Field(default_factory=_utcnow)
     status: str = Field(default="active")
     # Last time prune-closed fetched this posting and got a definitive
     # open/closed answer. None = never checked (or only ever failed to fetch).
@@ -45,7 +50,7 @@ class Score(SQLModel, table=True):
     positioning_notes: str
     rationale: str
     raw_response: str
-    scored_at: datetime = Field(default_factory=datetime.utcnow)
+    scored_at: datetime = Field(default_factory=_utcnow)
 
 
 class Application(SQLModel, table=True):
@@ -71,7 +76,7 @@ class UserJobMeta(SQLModel, table=True):
     # prescreen_status: approved | rejected | manual_override | None
     prescreen_status: Optional[str] = Field(default=None)
     prescreen_reason: Optional[str] = Field(default=None)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 _engine = None
@@ -133,7 +138,7 @@ def upsert_job(session: Session, job: Job) -> bool:
     """Insert or update a job. Returns True if new, False if updated."""
     existing = session.get(Job, job.id)
     if existing:
-        existing.last_seen = datetime.utcnow()
+        existing.last_seen = _utcnow()
         # "out_of_scope" is a deliberate user-side hide (e.g. the 2026-10
         # geography rescope); re-seeing the posting must not revive it.
         if existing.status != "out_of_scope":
