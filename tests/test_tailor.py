@@ -57,8 +57,8 @@ Data leader with ten years of experience.
     budgets = budgets_from_markdown(md)
     by_loc = {b["locator"]: b for b in budgets}
     assert by_loc["Introduction"]["budget"] == len("Data leader with ten years of experience.")
-    assert "Work Experience | Acme Corp" in by_loc
-    assert by_loc["Work Experience | Acme Corp"]["budget"] == len("Led migration of batch pipelines.")
+    assert by_loc["Work Experience | Acme Corp bullet 1"]["budget"] == len("Led migration of batch pipelines.")
+    assert by_loc["Work Experience | Acme Corp bullet 2"]["budget"] == len("Built a team of five.")
 
 
 def _make_pptx(path, bullets):

@@ -113,6 +113,7 @@ overflow its text frame, because the original fits. Reorders need no
     budgets: list[dict] = []
     section: str | None = None
     company: str | None = None
+    counters: dict[str, int] = {}
     for raw in resume_text.split("\n"):
         s = raw.strip()
         if s.startswith("## "):
@@ -125,7 +126,9 @@ overflow its text frame, because the original fits. Reorders need no
         elif section in ("Work Experience", "Early Career") and s.startswith("- "):
             bullet = s[2:].strip()
             where = f"{section} | {company}" if company else section
-            budgets.append({"locator": where, "original": bullet, "budget": len(bullet)})
+            counters[where] = counters.get(where, 0) + 1
+            budgets.append({"locator": f"{where} bullet {counters[where]}",
+                            "original": bullet, "budget": len(bullet)})
     return budgets
 
 
