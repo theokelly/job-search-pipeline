@@ -266,6 +266,12 @@ _PROFILE_SPEC: dict[str, object] = {
             "local_path": str,
         }],
     },
+    "tailoring": {
+        "pptx_map": dict,
+        "base_pptx_drive_id": str,
+        "output_parent_folder_id": str,
+        "upload_to_drive": bool,
+    },
 }
 
 

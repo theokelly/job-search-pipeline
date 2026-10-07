@@ -26,6 +26,7 @@ def run_generate(
     from ..generation.cover_letter import generate_cover_letter
     from ..generation.resume_recommendation import generate_resume_recommendation
     from ..output import write_outputs
+    from ..tailor import budgets_from_markdown
     from sqlmodel import select
 
     target_tiers = [t.strip() for t in tiers.split(",")]
@@ -119,7 +120,9 @@ def run_generate(
 
             try:
                 cover_letter = generate_cover_letter(canonical, canonical_score, profile_files, profile)
-                resume_rec = generate_resume_recommendation(canonical, canonical_score, resume_text, profile)
+                resume_rec = generate_resume_recommendation(
+                    canonical, canonical_score, resume_text, profile,
+                    budgets_from_markdown(resume_text))
                 out_dir = write_outputs(canonical, canonical_score, cover_letter, resume_rec, user_slug=user_slug)
                 generated_clusters += 1
 

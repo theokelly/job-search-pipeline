@@ -56,6 +56,7 @@ Then open **http://localhost:8501** in your browser.
 .venv/bin/job-agent doctor                # health check: profile, env, file sync status (read-only)
 .venv/bin/job-agent sync-profile          # dry-run Drive → local sync for profile files (add --apply to write)
 .venv/bin/job-agent sync-profile --file starls --verbose   # one file, full diff
+.venv/bin/job-agent tailor-resume outputs/theo/2026-10-07_acme_data-scientist   # apply rec edits to PPTX copy
 ```
 
 ### Output structure
@@ -178,6 +179,28 @@ To find a Greenhouse token: check `https://boards.greenhouse.io/{token}`. To fin
 With `profile_sync.sync_on_load: true` in `theo.yaml`, generation (`job-agent generate` and the UI's Generate button) auto-syncs first — skipped if synced within the last 15 minutes, and never breaks generation if Drive is unreachable.
 
 One-time OAuth setup: create a Desktop-app OAuth client in Google Cloud Console (enable Drive API + Docs API), save the client secrets to `data/drive_client.json`, then run `python3 scripts/drive_auth_local.py` on your Mac (needs a browser). Token lands in `data/drive_token.json`. File mappings live in the `profile_sync:` block of `theo.yaml`.
+
+---
+
+## Resume tailoring
+
+`job-agent tailor-resume` applies a generated `resume_recommendation.md` to a copy of the base resume PPTX — swaps and in-section bullet reorders, with formatting preserved:
+
+```bash
+.venv/bin/job-agent tailor-resume outputs/theo/2026-10-07_acme_data-scientist
+.venv/bin/job-agent tailor-resume outputs/theo/2026-10-07_acme_data-scientist --dry-run   # preview only
+.venv/bin/job-agent tailor-resume outputs/theo/2026-10-07_acme_data-scientist --no-upload # skip Drive
+```
+
+Writes `resume_tailored.pptx` next to the recommendation and flags any edit that might have overflowed its text frame for a quick visual check (exit code 2 when flagged). A human review pass is still expected — this removes the mechanical toil, not the judgment.
+
+**Two layers, kept in sync.** The `.md` files under `profile/resume_versions/` are the *text* layer (what the LLM reads; character budgets for layout-safe suggestions come from here). The base PPTX is the *layout* layer (what gets edited). `job-agent doctor` runs `extract_resume.py --check` to verify they match — regenerate the `.md` from the PPTX when the base changes.
+
+**Drive flow** (`tailoring:` block in `theo.yaml`):
+
+- `base_pptx_drive_id` — a static "latest base" PPTX in Drive. Update it in place whenever the base changes; `tailor-resume` downloads it instead of using the local `pptx_map`.
+- `output_parent_folder_id` — the Drive folder holding your `YYYY_MM` month folders. The tailored PPTX uploads to the current month's folder (created if missing) as `TheoKelly_CV_{company}_{YYYY-MM-DD}.pptx`.
+- `upload_to_drive: true` — upload by default; `--no-upload` skips it. The local copy in the output dir is always written.
 
 ---
 

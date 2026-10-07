@@ -374,5 +374,30 @@ def sync_profile(
         typer.echo("or add --verbose to see the full diffs.")
 
 
+@app.command(name="tailor-resume")
+def tailor_resume(
+    output_dir: str = typer.Argument(..., help="Application output dir, e.g. outputs/theo/2026-10-07_acme_data-scientist"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report what would change without writing the PPTX"),
+    upload: Optional[bool] = typer.Option(None, "--upload/--no-upload", help="Upload the tailored PPTX to Drive (default: tailoring.upload_to_drive)"),
+):
+    """Apply resume_recommendation.md edits to a copy of the base resume PPTX.
+
+    Writes resume_tailored.pptx next to the recommendation. Flags any edit
+    that might have overflowed its text frame for a quick visual check.
+    """
+    _bootstrap()
+    from .config import load_profile
+    from .tailor import tailor_from_output_dir, format_report
+    try:
+        report = tailor_from_output_dir(output_dir, load_profile("profile/theo.yaml"),
+                                        dry_run=dry_run, upload=upload)
+    except (FileNotFoundError, ValueError) as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+    typer.echo(format_report(report))
+    if report["flagged"] or report.get("drive_upload_error"):
+        raise typer.Exit(2)
+
+
 if __name__ == "__main__":
     app()

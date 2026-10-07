@@ -19,9 +19,14 @@ RESUME_TOOL = {
                 "items": {
                     "type": "object",
                     "properties": {
+                        "operation": {
+                            "type": "string",
+                            "enum": ["replace", "reorder"],
+                            "description": "replace: swap original text for suggested text. reorder: move the 'original' bullet to directly after the 'suggested' bullet within the same section (use suggested='__FIRST__' to move it to the top of its section).",
+                        },
                         "section": {"type": "string", "description": "Which section or bullet to edit."},
-                        "original": {"type": "string", "description": "The existing text to change."},
-                        "suggested": {"type": "string", "description": "The replacement text."},
+                        "original": {"type": "string", "description": "The existing text to change (replace) or the bullet to move (reorder)."},
+                        "suggested": {"type": "string", "description": "The replacement text (replace) or the bullet it should follow (reorder)."},
                         "reason": {"type": "string", "description": "Why this edit helps for this role."},
                     },
                     "required": ["section", "suggested", "reason"],
@@ -35,10 +40,29 @@ RESUME_TOOL = {
 }
 
 
-def build_resume_rec_messages(job: Job, score: Score, resume_text: str, profile: dict) -> list[dict]:
-    """Render the resume-recommendation messages. Shared by sync + batch paths."""
+def build_resume_rec_messages(job: Job, score: Score, resume_text: str, profile: dict,
+                               budgets: list[dict] | None = None) -> list[dict]:
+    """Render the resume-recommendation messages. Shared by sync + batch paths.
+
+    budgets: optional [{locator, original, budget}] from extract_resume.
+    get_layout_budgets — hard character limits so suggested replacements fit
+    the PPTX text frames without manual doctoring.
+    """
     resume_chars = settings.truncation(profile, "resume_rec_resume_chars")
     jd_chars = settings.truncation(profile, "resume_rec_jd_chars")
+    layout_block = ""
+    if budgets:
+        lines = [
+            "## Layout budgets (hard constraints)",
+            "This resume is a designed PPTX: every text frame has a fixed size.",
+            "A 'replace' suggested text MUST be no longer than its budget (character count).",
+            "If the point doesn't fit, shorten it — never overflow. Reorders need no budget.",
+            "",
+        ]
+        for b in budgets:
+            preview = b["original"][:60] + ("..." if len(b["original"]) > 60 else "")
+            lines.append(f"- {b['locator']}: max {b['budget']} chars — \"{preview}\"")
+        layout_block = "\n".join(lines) + "\n\n"
     return [
         {
             "role": "user",
@@ -54,7 +78,7 @@ Provide surgical, specific recommendations — not generic advice.
                 },
                 {
                     "type": "text",
-                    "text": f"""## Target role
+                    "text": f"""{layout_block}## Target role
 Company: {job.company}
 Title: {job.title}
 
@@ -66,7 +90,9 @@ Positioning strengths: {score.positioning_notes}
 Gaps: {score.gap_assessment}
 
 Call record_resume_recommendation with 1-3 specific text-level edits.
-Do not suggest rewriting the whole resume. Focus on the intro paragraph, 1-2 bullets, or keyword additions that matter most for this role.""",
+Do not suggest rewriting the whole resume. Focus on the intro paragraph, 1-2 bullets, or keyword additions that matter most for this role.
+Prefer 'reorder' when simply promoting an existing bullet; use 'replace' with
+budget-respecting text when the wording itself must change.""",
                 },
             ],
         }
@@ -103,19 +129,25 @@ def format_resume_rec(score: Score, data: dict) -> str:
     lines = [f"**Resume version:** {score.recommended_resume_version}",
              f"**Why:** {data['version_rationale']}", ""]
     for edit in data.get("edits", []):
+        op = edit.get("operation", "replace")
         lines.append(f"**{edit['section']}**")
         lines.append("")
-        lines.extend(_bullet_lines("Original", edit.get("original", "")))
-        lines.extend(_bullet_lines("Suggested", edit.get("suggested", "")))
+        if op == "reorder":
+            lines.extend(_bullet_lines("Move", edit.get("original", "")))
+            lines.extend(_bullet_lines("After", edit.get("suggested", "")))
+        else:
+            lines.extend(_bullet_lines("Original", edit.get("original", "")))
+            lines.extend(_bullet_lines("Suggested", edit.get("suggested", "")))
         lines.extend(_bullet_lines("Why", edit.get("reason", "")))
         lines.append("")
     return "\n".join(lines)
 
 
-def generate_resume_recommendation(job: Job, score: Score, resume_text: str, profile: dict) -> str:
+def generate_resume_recommendation(job: Job, score: Score, resume_text: str, profile: dict,
+                                   budgets: list[dict] | None = None) -> str:
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     model = settings.model_for(profile, "resume_recommendation")
-    messages = build_resume_rec_messages(job, score, resume_text, profile)
+    messages = build_resume_rec_messages(job, score, resume_text, profile, budgets)
 
     response = client.messages.create(
         model=model,
