@@ -399,5 +399,85 @@ def tailor_resume(
         raise typer.Exit(2)
 
 
+@app.command(name="refresh-recs")
+def refresh_recs(
+    days: int = typer.Option(30, "--days", help="Only refresh recs for materials generated in the last N days"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List what would be refreshed without calling the API"),
+    limit: Optional[int] = typer.Option(None, "--limit", help="Max recs to refresh"),
+    user: str = typer.Option("theo", "--user"),
+):
+    """Regenerate resume recommendations with the current (budget-aware) prompt.
+
+    For materials generated before the layout-budget constraints were added.
+    Dry-run first to see the count and estimated cost (Haiku, ~$0.006 each).
+    """
+    _bootstrap()
+    import re
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+    from .db import init_db, get_session, Job, Score, User, Application
+    from .config import load_profile, load_profile_files
+    from .generation.resume_recommendation import generate_resume_recommendation
+    from .tailor import budgets_from_markdown
+    from sqlmodel import select
+
+    init_db()
+    profile = load_profile("profile/theo.yaml")
+    profile_files = load_profile_files(profile=profile)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+
+    with get_session() as session:
+        db_user = session.exec(select(User).where(User.slug == user)).first()
+        if not db_user:
+            typer.echo(f"User '{user}' not found.", err=True)
+            raise typer.Exit(1)
+        apps = session.exec(
+            select(Application).where(Application.user_id == db_user.id)
+        ).all()
+
+        targets: list = []
+        for app in apps:
+            m = re.match(r"(\d{4})-(\d{2})-(\d{2})", Path(app.materials_path).name)
+            if not m:
+                continue
+            dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            if dt < cutoff:
+                continue
+            if not (Path(app.materials_path) / "resume_recommendation.md").exists():
+                continue
+            targets.append((app, dt))
+        targets.sort(key=lambda t: t[1], reverse=True)
+        if limit:
+            targets = targets[:limit]
+
+        typer.echo(f"{len(targets)} recommendation(s) from the last {days} days "
+                   f"(~${len(targets) * 0.006:.2f} at Haiku rates)")
+        if dry_run:
+            for app, dt in targets:
+                typer.echo(f"  {dt.date()}  {app.materials_path}")
+            return
+
+        for i, (app, dt) in enumerate(targets, 1):
+            job = session.get(Job, app.job_id)
+            score = session.exec(
+                select(Score).where(Score.job_id == app.job_id, Score.user_id == db_user.id)
+                .order_by(Score.scored_at.desc())
+            ).first()
+            if not job or not score:
+                typer.echo(f"  [{i}/{len(targets)}] SKIP {app.materials_path} (no job/score)")
+                continue
+            resume_key = f"resume_versions/{score.recommended_resume_version}.md"
+            if not profile_files.get(resume_key):
+                resume_key = "resume_versions/ai_focused.md"
+            resume_text = profile_files.get(resume_key, "")
+            try:
+                rec = generate_resume_recommendation(
+                    job, score, resume_text, profile, budgets_from_markdown(resume_text))
+                (Path(app.materials_path) / "resume_recommendation.md").write_text(rec)
+                typer.echo(f"  [{i}/{len(targets)}] refreshed {Path(app.materials_path).name}")
+            except Exception as e:
+                typer.echo(f"  [{i}/{len(targets)}] ERROR {app.materials_path}: {e}")
+
+
 if __name__ == "__main__":
     app()
