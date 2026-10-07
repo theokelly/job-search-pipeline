@@ -1,0 +1,52 @@
+flowchart TD
+    subgraph SRC[Sources]
+        LI[LinkedIn search]
+        GH[Greenhouse ATS]
+        LV[Lever ATS]
+        EM[Gmail job alerts]
+        MAN[Manual entry]
+    end
+
+    LI --> F
+    GH --> F
+    LV --> F
+    EM --> F
+    MAN --> F
+
+    F["1 · Pre-filter<br/><i>rules · free</i>"]
+    CL["2 · Cluster<br/><i>company + title key</i>"]
+    PS["3 · Prescreen<br/><i>Haiku · cheap gate</i>"]
+    SC["4 · Score<br/><i>Sonnet · assign tier</i>"]
+    GEN["5 · Generate<br/><i>Opus · Strong Fit only</i>"]
+    UI["6 · Review<br/><i>Streamlit · human in the loop</i>"]
+
+    F -->|kept| CL
+    F -.->|dropped: dealbreaker /<br/>role / geography| X1((discarded))
+    CL -->|one canonical<br/>per cluster| PS
+    PS -->|approved| SC
+    PS -.->|rejected| X2((skipped))
+    SC -->|Strong Fit| GEN
+    SC -.->|Worth Reviewing /<br/>Long Shot / Skip| DB[(SQLite DB)]
+    GEN -->|cover letter +<br/>resume rec| UI
+
+    CL -. "results replicate<br/>to sibling postings" .-> SIB[/sibling jobs/]
+
+    F --> DB
+    SC --> DB
+    GEN --> DB
+    UI <--> DB
+    UI -.->|on-demand override:<br/>score / generate now| SC
+
+    classDef free fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
+    classDef cheap fill:#fff8e1,stroke:#f9a825,color:#7f6000;
+    classDef mid fill:#fff3e0,stroke:#ef6c00,color:#7f3e00;
+    classDef expensive fill:#fce4ec,stroke:#c2185b,color:#7a0c37;
+    classDef human fill:#e3f2fd,stroke:#1565c0,color:#0d3c78;
+    classDef store fill:#f3e5f5,stroke:#6a1b9a,color:#3e0764;
+
+    class F,CL free;
+    class PS cheap;
+    class SC mid;
+    class GEN expensive;
+    class UI human;
+    class DB store;

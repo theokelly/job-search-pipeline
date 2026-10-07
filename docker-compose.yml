@@ -1,0 +1,15 @@
+services:
+  dev:
+    build: .
+    volumes:
+      - .:/workspace
+      - claude-auth:/home/claude-user/.claude
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    stdin_open: true
+    tty: true
+
+volumes:
+  claude-auth:

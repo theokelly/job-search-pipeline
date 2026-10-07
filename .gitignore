@@ -1,0 +1,45 @@
+# Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# User-specific profile (real data). Examples live in profile_template/.
+profile/
+!profile_template/
+
+# Personal planning / handoff notes
+HANDOFF.md
+
+# User-specific scoring calibration test (uses real job postings + profile)
+tests/test_scoring_calibration.py
+tests/fixtures/
+
+# Runtime data
+data/
+outputs/
+backups/
+*.sqlite
+*.sqlite-journal
+*.db
+*.bak-*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Node (mermaid rendering tooling)
+node_modules/
+
+# Tooling / editor / OS
+.DS_Store
+*.code-workspace
+.claude/
+.vscode/
+.idea/
