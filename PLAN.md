@@ -1,6 +1,6 @@
 # Work Plan — Architecture Cleanup + Material-Update Automation
 
-Sk etched 2026-10-07. Sequenced so each phase de-risks the next.
+Sketched 2026-10-07. Sequenced so each phase de-risks the next.
 Status: Phase A blocked on manual `git init` (no shell access from agent).
 No code edits until Phase A is complete.
 
