@@ -57,6 +57,7 @@ Then open **http://localhost:8501** in your browser.
 .venv/bin/job-agent sync-profile          # dry-run Drive → local sync for profile files (add --apply to write)
 .venv/bin/job-agent sync-profile --file starls --verbose   # one file, full diff
 .venv/bin/job-agent tailor-resume outputs/theo/2026-10-07_acme_data-scientist   # apply rec edits to PPTX copy
+.venv/bin/job-agent refresh-recs --days 30 --dry-run   # list recs eligible for regeneration
 ```
 
 ### Output structure
