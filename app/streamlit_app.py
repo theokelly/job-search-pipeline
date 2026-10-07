@@ -520,6 +520,30 @@ def generate_materials_now(job_id: str, user_id: int) -> Path:
     return out_dir
 
 
+def tailor_resume_now(materials_path: str) -> dict:
+    """Apply the resume recommendation to a PPTX copy. Returns the tailor report."""
+    from src.job_agent.tailor import tailor_from_output_dir
+    profile = load_profile("profile/theo.yaml")
+    return tailor_from_output_dir(materials_path, profile)
+
+
+def render_tailor_report(report: dict):
+    """Display a tailor report in the UI."""
+    from src.job_agent.tailor import format_report
+    up = report.get("drive_upload") or {}
+    if up.get("web_link"):
+        st.success(f"📤 Uploaded to Drive: [{up['filename']}]({up['web_link']})")
+    elif up:
+        st.success(f"📤 Uploaded to Drive as {up['filename']}")
+    if report.get("drive_upload_error"):
+        st.error(f"Drive upload failed: {report['drive_upload_error']}")
+    n_flag = len(report.get("flagged", []))
+    if n_flag:
+        st.warning(f"⚠️ {n_flag} edit(s) need your eye — see the report below.")
+    with st.expander("Full tailor report", expanded=n_flag > 0):
+        st.code(format_report(report), language="text")
+
+
 def read_material(materials_path: str, filename: str) -> str:
     p = Path(materials_path) / filename
     return p.read_text() if p.exists() else ""
@@ -887,6 +911,27 @@ def render_job_detail(job_id: str):
             if jm_text:
                 with st.expander("Job summary (job.md)"):
                     st.markdown(jm_text)
+            st.markdown("---")
+            st.markdown("**📄 Tailored resume**")
+            tailored_path = Path(app.materials_path) / "resume_tailored.pptx"
+            if tailored_path.exists():
+                st.download_button(
+                    "⬇️ Download resume_tailored.pptx",
+                    tailored_path.read_bytes(),
+                    file_name=f"resume_tailored_{job_id[:8]}.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    key=f"dl_tailored_{job_id}",
+                )
+            if st.button("✨ Tailor resume PPTX", key=f"tailor_{job_id}",
+                         help="Apply the recommendation above to a copy of the base resume (Drive)"):
+                with st.spinner("Downloading base, applying edits, uploading to Drive..."):
+                    try:
+                        st.session_state[f"tailor_report_{job_id}"] = tailor_resume_now(app.materials_path)
+                    except Exception as e:
+                        st.error(f"Tailoring failed: {e}")
+            report = st.session_state.get(f"tailor_report_{job_id}")
+            if report:
+                render_tailor_report(report)
         elif sc and sc.tier in ("Strong Fit", "Worth Reviewing"):
             st.info("Materials not yet generated.")
             if st.button("⚡ Generate materials now", key="gen_rr", type="primary"):

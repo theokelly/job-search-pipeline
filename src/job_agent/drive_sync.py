@@ -34,7 +34,9 @@ class DriveNotConfigured(DriveSyncError):
 
 
 SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
+    # Full drive scope (not drive.file): tailor-resume must find month folders
+    # Theo created manually, which drive.file's per-app view would not see.
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/documents.readonly",
 ]
 
