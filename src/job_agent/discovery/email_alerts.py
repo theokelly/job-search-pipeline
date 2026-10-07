@@ -293,19 +293,27 @@ def _fetch_from_label(
     try:
         status, _ = conn.select(f'"{label}"', readonly=True)
         if status != "OK":
+            print(f"  [email] label '{label}' unavailable, skipping", flush=True)
             return []
     except Exception:
+        print(f"  [email] label '{label}' unavailable, skipping", flush=True)
         return []
 
     from datetime import timedelta
     since_date = (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=since_days)).strftime("%d-%b-%Y")
     _, data = conn.search(None, f'SINCE {since_date}')
     if not data[0]:
+        print(f"  [email] '{label}': no messages in last {since_days}d", flush=True)
         return []
+
+    msg_nums = data[0].split()
+    print(f"  [email] '{label}': scanning {len(msg_nums)} messages...", flush=True)
 
     jobs: list[Job] = []
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    for num in data[0].split():
+    for idx, num in enumerate(msg_nums):
+        if (idx + 1) % 5 == 0 or idx + 1 == len(msg_nums):
+            print(f"  [email] '{label}': {idx + 1}/{len(msg_nums)} messages", flush=True)
         _, raw_data = conn.fetch(num, "(RFC822)")
         msg = _email_lib.message_from_bytes(raw_data[0][1])
         plain, html_body = _get_body(msg)
@@ -414,6 +422,7 @@ def _fetch_from_label(
                     status="active",
                 ))
 
+    print(f"  [email] '{label}': {len(jobs)} jobs from {len(msg_nums)} messages", flush=True)
     return jobs
 
 
@@ -448,6 +457,7 @@ def fetch_alert_jobs(
     if labels is None:
         labels = _DEFAULT_LABELS
 
+    print("  [email] connecting to Gmail IMAP...", flush=True)
     conn = _connect()
     all_jobs: list[Job] = []
     try:
