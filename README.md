@@ -22,14 +22,14 @@ claude --dangerously-skip-permissions
 ### Run the pipeline
 
 ```bash
-# Full pipeline: LinkedIn search + ATS companies + score + generate materials
+# Pipeline: LinkedIn search + ATS companies + score (generation is on-demand)
 .venv/bin/job-agent run --linkedin --email-days 14
 
 # With Gmail alert ingestion (requires app password in .env — see Gmail setup below)
 .venv/bin/job-agent run --linkedin --email --email-days 14
 ```
 
-Discovers new jobs → scores unscored jobs → generates cover letters and resume recs for **Strong Fit only** (default). Worth Reviewing jobs are scored and visible in the UI — generate their materials on demand with the UI's "Generate Materials" button, or pass `--tiers "Strong Fit,Worth Reviewing"` to bulk-generate. Output lands in `outputs/theo/`.
+Discovers new jobs → scores unscored jobs. Materials (cover letter, resume recs, answers, grounding check) are generated **on demand**: click into a job in the UI and hit "Generate Materials", or run `.venv/bin/job-agent generate` for a batch of Strong Fit jobs (add `--tiers "Strong Fit,Worth Reviewing"` to include WR). Output lands in `outputs/theo/`.
 
 ### Open the UI
 

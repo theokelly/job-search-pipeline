@@ -134,7 +134,6 @@ def generate(
 def run(
     user: str = typer.Option("theo", "--user"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    tiers: str = typer.Option("Strong Fit", "--tiers", help='Comma-separated tiers to auto-generate materials for. Default: Strong Fit only (Worth Reviewing on demand via UI)'),
     prescreen: bool = typer.Option(True, "--prescreen/--no-prescreen", help="Run Haiku pre-filter before Sonnet scoring (default: on)"),
     rescore: bool = typer.Option(False, "--rescore", help="Also re-score jobs that already have a Score"),
     linkedin: bool = typer.Option(False, "--linkedin", help="Search LinkedIn via guest API"),
@@ -143,20 +142,21 @@ def run(
     refetch_jds: bool = typer.Option(False, "--refetch-jds", help="Re-fetch JDs for jobs already in the DB"),
     batch: Optional[bool] = typer.Option(None, "--batch/--no-batch", help="Use Anthropic batches for prescreen + score"),
 ):
-    """Run the full pipeline: sweep → discover → score → generate."""
+    """Run the pipeline: sweep → discover → score. Generation is on-demand only
+    (per-job from the Streamlit UI, or `job-agent generate` for a batch)."""
     _bootstrap()
     from .config import load_profile
     from . import settings
-    from .pipeline import run_discover, run_sweep, run_score, run_generate, run_prune_closed
+    from .pipeline import run_discover, run_sweep, run_score, run_prune_closed
 
     profile = load_profile("profile/theo.yaml")
     pipe_cfg = settings.pipeline_config(profile)
 
     if pipe_cfg.get("auto_sweep_on_run", True) and not dry_run:
-        typer.echo("=== Step 0/3: Sweep stale postings ===")
+        typer.echo("=== Step 0/2: Sweep stale postings ===")
         run_sweep()
 
-    typer.echo("=== Step 1/3: Discover ===")
+    typer.echo("=== Step 1/2: Discover ===")
     counts, _ = run_discover(
         dry_run=dry_run, include_linkedin=linkedin, include_email=email,
         email_days=email_days, refetch_jds=refetch_jds,
@@ -164,26 +164,20 @@ def run(
     _print_discover_summary(counts, dry_run, indent="  ")
 
     if dry_run:
-        typer.echo("\n[dry-run] Skipping score + generate steps.")
+        typer.echo("\n[dry-run] Skipping score step.")
         return
 
     if pipe_cfg.get("prune_closed_on_run", True):
-        typer.echo("\n=== Step 1b/3: Prune closed LinkedIn postings ===")
+        typer.echo("\n=== Step 1b/2: Prune closed LinkedIn postings ===")
         run_prune_closed()
 
-    typer.echo("\n=== Step 2/3: Score ===")
+    typer.echo("\n=== Step 2/2: Score ===")
     scored = run_score(user_slug=user, prescreen=prescreen, rescore=rescore, use_batch=batch)
     for job, s in scored:
         typer.echo(f"  {job.company} — {job.title} → {s.tier}")
     typer.echo(f"  Scored {len(scored)} jobs.")
 
-    typer.echo("\n=== Step 3/3: Generate ===")
-    outputs = run_generate(user_slug=user, tiers=tiers)
-    for job, s, out_dir in outputs:
-        typer.echo(f"  {job.company} — {job.title} ({s.tier}) → {out_dir}")
-    typer.echo(f"  Generated materials for {len(outputs)} jobs.")
-
-    typer.echo("\nPipeline complete.")
+    typer.echo("\nPipeline complete. Generate materials on demand: per-job in the UI or `job-agent generate`.")
 
 
 @app.command(name="batch-fetch")
