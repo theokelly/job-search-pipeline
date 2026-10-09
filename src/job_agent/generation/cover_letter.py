@@ -70,7 +70,7 @@ Gaps to avoid over-claiming: {score.gap_assessment}
 
 ## Task
 Write a complete cover letter. Hard constraints:
-- 350-500 words, 4-5 paragraphs
+- 350-430 words, 4-5 paragraphs. Hard ceiling of 430 words: the letter must fit on one printed page
 - No em dashes, no "genuinely", no bullet points, no contrast framing as a crutch
 - Open with the role + a real reason for applying (NOT "I am writing to express my interest")
 - 2 evidence paragraphs with specific numbers and named programs

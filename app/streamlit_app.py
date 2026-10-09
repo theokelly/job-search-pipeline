@@ -527,6 +527,13 @@ def tailor_resume_now(materials_path: str) -> dict:
     return tailor_from_output_dir(materials_path, profile)
 
 
+def build_cover_letter_doc_now(materials_path: str) -> dict:
+    """Build a styled cover-letter Google Doc from cover_letter.md; upload to the monthly Drive folder."""
+    from src.job_agent.cover_letter_doc import build_cover_letter_doc
+    profile = load_profile("profile/theo.yaml")
+    return build_cover_letter_doc(materials_path, profile)
+
+
 def render_tailor_report(report: dict):
     """Display a tailor report in the UI."""
     from src.job_agent.tailor import format_report
@@ -900,6 +907,25 @@ def render_job_detail(job_id: str):
             if ans_text:
                 with st.expander("📝 Application answers (copy-paste for forms)"):
                     st.markdown(ans_text)
+            st.markdown("---")
+            st.markdown("**📄 Cover letter Doc**")
+            if st.button("📄 Create cover letter Doc in Drive", key=f"cldoc_{job_id}",
+                         help="Build a styled Google Doc from this cover letter (sample formatting) into this month's Drive folder"):
+                with st.spinner("Creating styled Google Doc and uploading to Drive..."):
+                    try:
+                        st.session_state[f"cldoc_report_{job_id}"] = build_cover_letter_doc_now(app.materials_path)
+                    except Exception as e:
+                        st.error(f"Cover letter Doc failed: {e}")
+            cldoc_report = st.session_state.get(f"cldoc_report_{job_id}")
+            if cldoc_report:
+                if cldoc_report.get("web_link"):
+                    st.success(f"📤 Created in Drive: [{cldoc_report['filename']}]({cldoc_report['web_link']})")
+                else:
+                    st.success(f"📄 Created: {cldoc_report['filename']}")
+                if cldoc_report.get("length_warning"):
+                    st.warning(f"⚠️ {cldoc_report['length_warning']}")
+                else:
+                    st.caption(f"{cldoc_report['word_count']} words (sample one-pager: {cldoc_report['sample_word_count']})")
         elif sc and sc.tier in ("Strong Fit", "Worth Reviewing"):
             st.info("Materials not yet generated for this job.")
             if st.button("⚡ Generate materials now", key="gen_cl", type="primary"):
