@@ -910,6 +910,17 @@ def render_job_detail(job_id: str):
                         st.rerun()
                     except Exception as e:
                         st.error(f"Generation failed: {e}")
+        elif sc:
+            st.warning(f"Scored **{sc.tier}** — below the auto-generate hurdle.")
+            if st.button("⚡ Generate materials anyway", key="gen_cl_anyway", type="secondary",
+                         help="Force-generate cover letter and resume recommendation despite the tier"):
+                with st.spinner("Generating cover letter and resume recommendation..."):
+                    try:
+                        out_dir = generate_materials_now(job_id, user_id)
+                        st.success(f"Generated → {out_dir}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Generation failed: {e}")
         else:
             st.info("Score this job first to generate materials.")
 
@@ -946,6 +957,17 @@ def render_job_detail(job_id: str):
         elif sc and sc.tier in ("Strong Fit", "Worth Reviewing"):
             st.info("Materials not yet generated.")
             if st.button("⚡ Generate materials now", key="gen_rr", type="primary"):
+                with st.spinner("Generating..."):
+                    try:
+                        out_dir = generate_materials_now(job_id, user_id)
+                        st.success(f"Generated → {out_dir}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Generation failed: {e}")
+        elif sc:
+            st.warning(f"Scored **{sc.tier}** — below the auto-generate hurdle.")
+            if st.button("⚡ Generate materials anyway", key="gen_rr_anyway", type="secondary",
+                         help="Force-generate cover letter and resume recommendation despite the tier"):
                 with st.spinner("Generating..."):
                     try:
                         out_dir = generate_materials_now(job_id, user_id)
