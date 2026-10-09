@@ -20,7 +20,7 @@ REPO = Path(__file__).resolve().parent.parent
 SECRETS = REPO / "data" / "drive_client.json"
 TOKEN = REPO / "data" / "drive_token.json"
 SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/documents.readonly",
 ]
 
