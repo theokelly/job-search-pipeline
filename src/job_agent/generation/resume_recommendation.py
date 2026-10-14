@@ -29,7 +29,7 @@ RESUME_TOOL = {
                         "suggested": {"type": "string", "description": "The replacement text (replace) or the bullet it should follow (reorder)."},
                         "reason": {"type": "string", "description": "Why this edit helps for this role."},
                     },
-                    "required": ["section", "suggested", "reason"],
+                    "required": ["section", "original", "suggested", "reason"],
                 },
                 "minItems": 1,
                 "maxItems": 3,

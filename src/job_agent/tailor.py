@@ -95,6 +95,11 @@ def parse_recommendation(md_text: str) -> tuple[str | None, list[dict]]:
     for e in edits:
         for k in ("original", "suggested", "reason"):
             e[k] = e[k].strip()
+        if e["suggested"] == MOVE_FIRST and e["operation"] != "reorder":
+            # The tool schema documents suggested='__FIRST__' as "move to the
+            # top of its section"; models often emit it under a replace op —
+            # honor the intent as a reorder instead of writing it literally.
+            e["operation"] = "reorder"
     edits = [e for e in edits if e["suggested"] or e["original"]]
     return version, edits
 
