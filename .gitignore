@@ -45,3 +45,11 @@ node_modules/
 .claude/
 .vscode/
 .idea/
+
+# Personal planning docs (local only, not for public)
+PLAN.md
+GENERALIZATION.md
+
+# Personal planning docs (local only, not for public)
+PLAN.md
+GENERALIZATION.md
