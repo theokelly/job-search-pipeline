@@ -1,4 +1,4 @@
-# Job Application Agent
+# Job Search Pipeline
 
 Agentic pipeline for job discovery, fit scoring, and application-material generation. The job search is a funnel — finding postings, reading them, scoring fit, drafting letters — and most of it is toil. This automates the toil. The judgment stays human: nothing submits an application.
 
@@ -36,8 +36,8 @@ Two layers, kept in sync: the `.md` files under `profile/resume_versions/` are t
 Prerequisites: Docker and an Anthropic API key.
 
 ```bash
-git clone https://github.com/theokelly/job-application-agent.git
-cd job-application-agent
+git clone https://github.com/theokelly/job-search-pipeline.git
+cd job-search-pipeline
 cp .env.example .env                          # add your ANTHROPIC_API_KEY
 cp profile_template/example.yaml profile/theo.yaml   # your profile (gitignored)
 docker compose build

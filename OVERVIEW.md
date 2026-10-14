@@ -1,4 +1,4 @@
-# Job Application Agent — Quick Reference
+# Job Search Pipeline — Quick Reference
 
 *A conceptual overview for someone new to the project. This explains **what it does and how it works**, not how to operate it — see `README.md` for commands and setup.*
 
