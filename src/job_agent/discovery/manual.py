@@ -1,10 +1,12 @@
 """
 Fetch a single job posting from a URL.
 
-Three-stage cascade:
+Cascade:
   1. JSON-LD JobPosting (Greenhouse, Lever, Ashby, Workday, many corporate sites)
-  2. LinkedIn-specific selectors (reuse existing scraper)
-  3. Generic HTML extraction (h1 / og:site_name / body text)
+  2. Next.js __NEXT_DATA__ blobs (Greenhouse-shaped job objects embedded by
+     proxied careers sites, e.g. Vinted — those pages carry no JSON-LD)
+  3. LinkedIn-specific selectors (reuse existing scraper)
+  4. Generic HTML extraction (h1 / og:site_name / body text)
 
 Returns a dict with title/company/location/description/url. Any field may be ""
 on failure — the Streamlit UI surfaces a blank, editable form in that case so
@@ -120,7 +122,95 @@ def _one_location(loc) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Stage 2: LinkedIn-specific
+# Stage 2: Next.js __NEXT_DATA__ (Greenhouse-shaped job objects)
+# ---------------------------------------------------------------------------
+# Some careers sites (e.g. Vinted) are Next.js frontends over an ATS. The
+# full job record ships as JSON in <script id="__NEXT_DATA__"> and there is
+# no JSON-LD, so without this stage the cascade falls through to generic
+# HTML extraction and mangles every field.
+
+def _extract_next_data(soup: BeautifulSoup, url: str) -> dict:
+    out = dict(_EMPTY)
+    tag = soup.find("script", id="__NEXT_DATA__")
+    if not tag or not tag.string:
+        return out
+    try:
+        data = json.loads(tag.string)
+    except (json.JSONDecodeError, TypeError):
+        return out
+
+    job = _next_data_job(data, url)
+    if not job:
+        return out
+
+    out["title"] = (job.get("title") or "").strip()
+    out["company"] = (job.get("company_name") or "").strip()
+    loc = job.get("location")
+    if isinstance(loc, dict):
+        out["location"] = (loc.get("name") or "").strip()
+    elif isinstance(loc, str):
+        out["location"] = loc.strip()
+    content = job.get("content") or ""
+    if content:
+        out["description"] = _strip_html(content)[:20000]
+    return out
+
+
+def _is_greenhouse_job(obj) -> bool:
+    return (
+        isinstance(obj, dict)
+        and bool(obj.get("title"))
+        and bool(obj.get("company_name"))
+        and bool(obj.get("content"))
+    )
+
+
+def _next_data_job(data, url: str) -> Optional[dict]:
+    """Locate the page's job object inside a __NEXT_DATA__ blob.
+
+    Preference order:
+      1. props.pageProps.job.data — the canonical slot on job pages.
+      2. A Greenhouse-shaped object whose id matches the id in the URL
+         (listing blobs embed many jobs; the first one found is typically
+         a related job, not this page's).
+      3. The only Greenhouse-shaped object, when there is exactly one.
+    """
+    try:
+        cand = data["props"]["pageProps"]["job"]["data"]
+        if _is_greenhouse_job(cand):
+            return cand
+    except (KeyError, TypeError):
+        pass
+
+    candidates: list = []
+
+    def walk(o):
+        if _is_greenhouse_job(o):
+            candidates.append(o)
+            return
+        if isinstance(o, dict):
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(data)
+    if not candidates:
+        return None
+    m = re.search(r"(\d{5,})", url)
+    if m:
+        url_id = m.group(1)
+        for c in candidates:
+            if str(c.get("id")) == url_id:
+                return c
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: LinkedIn-specific
 # ---------------------------------------------------------------------------
 
 _LINKEDIN_JOB_ID_RE = re.compile(r"/jobs/(?:view|comm/jobs/view)/(\d+)")
@@ -148,7 +238,7 @@ def _extract_linkedin(url: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Stage 3: Generic HTML
+# Stage 4: Generic HTML
 # ---------------------------------------------------------------------------
 
 _BAD_DESC_PARENT_TAGS = {"nav", "footer", "header", "aside", "script", "style", "noscript"}
@@ -257,6 +347,10 @@ def fetch_from_url(url: str) -> dict:
     jsonld = _extract_jsonld(soup)
     if any(jsonld[k] for k in ("title", "description")):
         return _merge(_EMPTY, jsonld, {"url": url})
+
+    next_data = _extract_next_data(soup, url)
+    if any(next_data[k] for k in ("title", "description")):
+        return _merge(_EMPTY, next_data, {"url": url})
 
     generic = _extract_generic(soup, url)
     return _merge(_EMPTY, generic, {"url": url})
