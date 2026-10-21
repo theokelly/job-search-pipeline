@@ -28,7 +28,7 @@ NARRATIVE_PATH = "profile/narrative_guidance.md"
 # Kept dependency-free so this module loads in the streamlit Python (no typer there).
 def _default_echo(msg: str, err: bool = False) -> None:
     stream = sys.stderr if err else sys.stdout
-    print(msg, file=stream)
+    print(msg, file=stream, flush=True)
 
 
 def _replicate_score(original: Score, target_job_id: str) -> Score:

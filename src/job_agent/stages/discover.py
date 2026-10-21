@@ -122,6 +122,14 @@ def run_discover(
         except Exception as e:
             _note_error("email", e)
 
+    total_boards = sum(
+        1 for c in companies
+        if c.get("greenhouse_token") or c.get("lever_slug")
+        or c.get("ashby_board") or c.get("workday_board")
+    )
+    if total_boards:
+        echo(f"  [boards] fetching {total_boards} ATS boards...")
+    board_i = 0
     for company in companies:
         name = company.get("name", "")
         gh_token = company.get("greenhouse_token")
@@ -131,6 +139,7 @@ def run_discover(
 
         if not gh_token and not lever_slug and not ashby_board and not workday_board:
             continue
+        board_i += 1
 
         jobs = []
         if gh_token:
@@ -154,6 +163,7 @@ def run_discover(
             except Exception as e:
                 _note_error(f"workday {name}", e)
 
+        echo(f"  [boards] {board_i}/{total_boards} {name}: {len(jobs)} jobs")
         for job in jobs:
             counts["found"] += 1
             keep, reason = pre_filter(job, profile)
@@ -166,6 +176,7 @@ def run_discover(
             results.append(("keep", job, None))
 
     if not dry_run:
+        echo(f"  [discover] saving {counts['passed']} jobs to DB...")
         with get_session() as session:
             for action, job, _ in results:
                 if action == "keep":
