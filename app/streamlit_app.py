@@ -73,7 +73,7 @@ POSTING_STATUS_LABELS = {
     "out_of_scope": "⊘ Out of scope",
 }
 
-# Sentinel used in the Status multiselect to represent rows with no assigned status.
+# Sentinel used in the Status filter to represent rows with no assigned status.
 # Kept distinct from None so it can travel through Streamlit widget state cleanly.
 NO_STATUS_SENTINEL = "__none__"
 SOURCE_LABELS = {
@@ -559,6 +559,65 @@ def read_material(materials_path: str, filename: str) -> str:
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
+def checkbox_multiselect(label, options, state_key, *, format_func=None):
+    """Dropdown-style multi-select built from a popover + checkboxes.
+
+    Unlike st.multiselect, selections are NOT rendered as pills inside the
+    field: the closed control shows only the label and a short summary
+    ("All", the single chosen value, or "N selected"). The selection itself
+    is kept in st.session_state[state_key] as a list, exactly like the value
+    the old st.multiselect calls returned, so downstream filtering is
+    unchanged.
+
+    External changes (the sidebar's Clear filters button, or the Select
+    all / Clear buttons inside the dropdown) can't rewrite checkbox widget
+    state mid-run, so they stash the desired selection in
+    st.session_state[f"{state_key}__pending"] and rerun; it is applied here,
+    before any checkbox for this filter is instantiated.
+    """
+    format_func = format_func or (lambda o: str(o))
+    pending_key = f"{state_key}__pending"
+
+    if pending_key in st.session_state:
+        pending = st.session_state.pop(pending_key)
+        for k in [k for k in st.session_state if k.startswith(f"{state_key}::")]:
+            del st.session_state[k]
+        st.session_state[state_key] = [o for o in options if o in pending]
+
+    selected = [o for o in options if o in st.session_state.get(state_key, [])]
+
+    # Initialise checkbox state for options not rendered yet. Existing keys
+    # are left alone — they carry the user's latest toggles into this run.
+    for opt in options:
+        cb_key = f"{state_key}::{opt}"
+        if cb_key not in st.session_state:
+            st.session_state[cb_key] = opt in selected
+
+    if not selected:
+        summary = "All"
+    elif len(selected) == 1:
+        summary = format_func(selected[0])
+    else:
+        summary = f"{len(selected)} selected"
+    if len(summary) > 30:
+        summary = summary[:29] + "…"
+
+    with st.popover(f"{label}: {summary}", width="stretch"):
+        col_all, col_none = st.columns(2)
+        if col_all.button("Select all", key=f"{state_key}__all", width="stretch"):
+            st.session_state[pending_key] = list(options)
+            st.rerun()
+        if col_none.button("Clear", key=f"{state_key}__none", width="stretch"):
+            st.session_state[pending_key] = []
+            st.rerun()
+        for opt in options:
+            st.checkbox(format_func(opt), key=f"{state_key}::{opt}")
+
+    selection = [o for o in options if st.session_state.get(f"{state_key}::{o}")]
+    st.session_state[state_key] = selection
+    return selection
+
+
 def render_sidebar(df: pd.DataFrame):
     with st.sidebar:
         st.title("🎯 Job Pipeline")
@@ -580,27 +639,23 @@ def render_sidebar(df: pd.DataFrame):
             st.markdown("**Filters**")
 
             all_tiers = sorted(df["display_tier"].dropna().unique(), key=lambda t: TIER_ORDER.get(t, 99))
-            st.session_state.filter_tiers = st.multiselect(
-                "Tier", options=all_tiers, default=st.session_state.filter_tiers
-            )
+            checkbox_multiselect("Tier", all_tiers, "filter_tiers")
 
             statuses = [NO_STATUS_SENTINEL, "applied", "interviewing", "offer", "rejected", "not_pursuing"]
             status_labels = {**APP_STATUS_LABELS, NO_STATUS_SENTINEL: "○ No status"}
-            st.session_state.filter_statuses = st.multiselect(
-                "Status", options=statuses, default=st.session_state.filter_statuses,
+            checkbox_multiselect(
+                "Status", statuses, "filter_statuses",
                 format_func=lambda s: status_labels.get(s, s),
             )
 
             sources = sorted(df["source"].dropna().unique())
-            st.session_state.filter_sources = st.multiselect(
-                "Source", options=sources, default=st.session_state.filter_sources,
-            )
+            checkbox_multiselect("Source", sources, "filter_sources")
 
             # City filter — sorted by frequency so the most common cities are at the top
             city_counts = df["city"].dropna().value_counts()
             cities = list(city_counts.index)
-            st.session_state.filter_cities = st.multiselect(
-                "City", options=cities, default=st.session_state.filter_cities,
+            checkbox_multiselect(
+                "City", cities, "filter_cities",
                 format_func=lambda c: f"{c} ({city_counts[c]})",
             )
 
@@ -639,10 +694,13 @@ def render_sidebar(df: pd.DataFrame):
                 st.session_state.filter_since != "all",
             ]):
                 if st.button("Clear filters", width="stretch"):
-                    st.session_state.filter_tiers = []
-                    st.session_state.filter_statuses = []
-                    st.session_state.filter_sources = []
-                    st.session_state.filter_cities = []
+                    # Checkbox states can't be rewritten from here (the
+                    # widgets already ran this pass), so queue the reset via
+                    # each filter's __pending slot; checkbox_multiselect
+                    # applies it at the top of the next run.
+                    for _fk in ("filter_tiers", "filter_statuses", "filter_sources", "filter_cities"):
+                        st.session_state[f"{_fk}__pending"] = []
+                        st.session_state[_fk] = []
                     st.session_state.search_text = ""
                     st.session_state.filter_since = "all"
                     st.session_state.filter_since_date = None
