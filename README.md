@@ -64,7 +64,7 @@ Everything personal lives in gitignored `profile/`: resume versions, STAR storie
 Measured costs with batching:
 
 | Operation | Model | Est. cost |
-|---|---|
+|---|---|---|
 | Prescreen 1 job | Haiku | ~$0.0005 |
 | Score 1 job | Sonnet | ~$0.005 |
 | Cover letter (Strong Fit) | Opus | ~$0.07 |
