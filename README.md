@@ -18,60 +18,47 @@ Agentic pipeline for job discovery, fit scoring, and application-material genera
 
 ```mermaid
 flowchart TD
-    RUN["<b>job-agent run</b>: sweep → discover → prune closed → score<br/><i>generation is on demand</i>"]
-
     subgraph SRC[Sources]
         LI[LinkedIn search]
-        ATS[ATS boards<br/>Greenhouse · Lever · Ashby · Workday]
+        GH[Greenhouse ATS]
+        LV[Lever ATS]
+        AS[Ashby ATS]
+        WD[Workday ATS]
         EM[Gmail job alerts]
-        MAN[Manual URL<br/>via Streamlit]
+        MAN[Manual entry]
     end
 
-    LI --> INT
-    ATS --> INT
-    EM --> INT
-    MAN --> INT
-    RUN -.->|orchestrates| INT
+    LI --> F
+    GH --> F
+    LV --> F
+    AS --> F
+    WD --> F
+    EM --> F
+    MAN --> F
 
-    INT["1 · Intake &amp; normalize<br/><i>fetch · normalize · upsert as Job rows</i>"]
-    F["2 · Pre-filter<br/><i>rules · free — dealbreakers / role / geography</i>"]
+    F["1 · Pre-filter<br/><i>rules · free</i>"]
+    CL["2 · Cluster<br/><i>company + title key</i>"]
+    PS["3 · Prescreen<br/><i>Haiku · cheap gate</i>"]
+    SC["4 · Score<br/><i>Sonnet · assign tier</i>"]
+    GEN["5 · Generate<br/><i>Opus · on demand</i>"]
+    UI["6 · Review &amp; apply<br/><i>Streamlit · operator console</i>"]
 
-    INT --> F
-    F -->|kept| PS
-    F -.->|dropped| X1((discarded<br/>not stored))
+    F -->|kept| CL
+    F -.->|dropped: dealbreaker /<br/>role / geography| X1((discarded))
+    CL -->|one canonical<br/>per cluster| PS
+    PS -->|approved| SC
+    PS -.->|rejected| X2((skipped))
+    SC -->|Strong Fit| GEN
+    SC -.->|Worth Reviewing /<br/>Long Shot / Skip| DB[(SQLite DB)]
+    GEN -->|cover letter +<br/>resume rec| UI
 
-    subgraph CLUS[Cluster-aware execution — canonical posting only, results replicate to siblings]
-        PS["3 · Prescreen<br/><i>Haiku · binary gate · batch or sync</i>"]
-        SC["4 · Score<br/><i>Sonnet · tier + sub-scores + gaps + positioning</i>"]
-        GEN["5 · Generate application packet<br/><i>on demand · cover letter Opus/Sonnet · resume rec + answers + grounding Haiku</i>"]
-        PS -->|approved| SC
-        SC -->|selected tiers| GEN
-    end
+    CL -. "results replicate<br/>to sibling postings" .-> SIB[/sibling jobs/]
 
-    PS -.->|rejected| X2((screened out<br/>reason stored))
-
-    PROF["Profile control plane<br/><i>target companies · dealbreakers · geography · rubric<br/>narrative · resumes · STAR · voice · model + batch settings</i>"]
-    PROF -.->|configures| F
-    PROF -.->|configures| PS
-    PROF -.->|configures| SC
-    PROF -.->|configures| GEN
-
-    DB[("SQLite state<br/>Job · Score · UserJobMeta · Application")]
-    SC -.->|scores stored| DB
-    GEN -.->|application row| DB
-
-    OUT["Application packet — outputs/&lt;user&gt;/&lt;date&gt;_&lt;company&gt;_&lt;role&gt;/<br/><i>job.md · cover_letter.md · resume_recommendation.md<br/>answers.md · grounding_check.md · score.json</i>"]
-    GEN --> OUT
-    DB -.->|materials_path| OUT
-
-    HK["Housekeeping<br/><i>sweep: stale → expired · prune: closed → closed</i>"]
-    HK -.->|maintains Job.status| DB
-
-    HUM["Human application workflow — Streamlit<br/><i>review · edit · tailor PPTX · Drive Doc · download packet<br/>record status (propagates across cluster)</i>"]
-    OUT --> HUM
-    HUM -.->|manual submission only| EMP[Employer ATS]
-    HUM -.->|record status| DB
-    HUM -.->|Add Job · score now · generate now| INT
+    F --> DB
+    SC --> DB
+    GEN --> DB
+    UI <--> DB
+    UI -.->|on-demand override:<br/>score / generate now| SC
 
     classDef free fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
     classDef cheap fill:#fff8e1,stroke:#f9a825,color:#7f6000;
@@ -79,97 +66,62 @@ flowchart TD
     classDef expensive fill:#fce4ec,stroke:#c2185b,color:#7a0c37;
     classDef human fill:#e3f2fd,stroke:#1565c0,color:#0d3c78;
     classDef store fill:#f3e5f5,stroke:#6a1b9a,color:#3e0764;
-    classDef ctrl fill:#eceff1,stroke:#546e7a,color:#263238;
 
-    class INT,F free;
+    class F,CL free;
     class PS cheap;
     class SC mid;
     class GEN expensive;
-    class HUM human;
+    class UI human;
     class DB store;
-    class PROF,RUN,HK ctrl;
 ```
 
 *System architecture:*
 
 ```mermaid
-flowchart TB
-    THEO["Theo<br/><i>operator · reviewer · applicant</i>"]
+flowchart TD
+    OP["Operator<br/><i>reviews · edits · submits</i>"]
 
-    subgraph EXT[External systems]
-        DRV["Google Drive / Docs<br/><i>profile files · base PPTX · monthly folders</i>"]
-        SRC["Job sources<br/><i>LinkedIn · ATS boards · Gmail alerts</i>"]
-        ANT["Anthropic API<br/><i>Haiku · Sonnet · Opus · Batches + sync</i>"]
-        EMP["Employer ATS<br/><i>outside the system</i>"]
+    subgraph DRV[Google Drive]
+        direction TB
+        APP["Application packets<br/><i>tailored resume · cover letter</i>"]
+        REF["Living Reference Docs<br/><i>profile · STAR stories · narrative · rubric</i>"]
+        APP ~~~ REF
     end
 
-    subgraph SYS[Local Docker workspace — single user]
-        subgraph IFACE[Interface layer]
-            UI["Streamlit operator console<br/><i>Jobs · Add Job · Stats</i>"]
-            CLI["job-agent CLI<br/><i>batch operations · utilities</i>"]
-        end
+    EMP["Employer ATS"]
+    OP -.->|edits| APP
+    APP -->|submitted manually| EMP
 
-        CODE["Shared Python package<br/><i>direct imports — no separate API service</i>"]
+    UI["Streamlit operator console<br/><i>Jobs · Add Job · Stats</i>"]
+    CLI["job-agent CLI<br/><i>run · generate · doctor · sync-profile</i>"]
+    OP --> UI
+    OP --> CLI
 
-        subgraph OPS[Application operations]
-            BUILD["Artifact builders<br/><i>tailor PPTX · cover-letter Doc</i>"]
-            DISC["Discovery<br/><i>ingest · sweep · prune</i>"]
-            SCORE["Scoring<br/><i>pre-filter · prescreen · score</i>"]
-            GEN["Generation<br/><i>application packet</i>"]
-        end
+    PIPE["Pipeline package<br/><i>discovery · scoring · generation · builders</i>"]
+    UI --> PIPE
+    CLI --> PIPE
 
-        PROF["Profile &amp; source material<br/><i>theo.yaml · rubric · narrative · resumes · STAR · voice</i>"]
+    SRC["Job sources<br/><i>LinkedIn · ATS boards · Gmail</i>"]
+    ANT["Anthropic API<br/><i>Haiku · Sonnet · Opus</i>"]
+    SRC --> PIPE
+    ANT --> PIPE
+    REF -.->|configures| PIPE
 
-        subgraph STATE[State &amp; artifacts]
-            DB[("SQLite — data/jobs.sqlite<br/>User · Job · Score · Application · UserJobMeta")]
-            OUT["outputs/<br/><i>application packets</i>"]
-            LOG["data/runs.log<br/><i>per-stage run records, written by stage wrappers</i>"]
-        end
-    end
-
-    THEO --> UI
-    THEO --> CLI
-    THEO -->|submits manually| EMP
-    UI --> CODE
-    CLI --> CODE
-    CODE --> DISC
-    CODE --> SCORE
-    CODE --> GEN
-    CODE --> BUILD
-
-    PROF -.->|configures| DISC
-    PROF -.->|configures| SCORE
-    PROF -.->|configures| GEN
-
-    SRC --> DISC
-    ANT --> SCORE
-    ANT --> GEN
-    DRV <-->|profile sync| PROF
-    DRV <-->|base PPTX down · documents up| BUILD
-
-    DISC --> DB
-    SCORE --> DB
-    GEN --> DB
-    GEN --> OUT
-    BUILD --> OUT
+    DB[("SQLite DB<br/>jobs · scores · applications")]
+    OUT["Application packet<br/><i>drafts in outputs/</i>"]
+    PIPE --> DB
+    PIPE --> OUT
     DB -.->|materials_path| OUT
+    UI <-->|browse · edit · track| DB
+    OUT -->|final documents| APP
 
-    UI <-.->|browse · edit · track| DB
-    UI -.->|read · download| OUT
-
+    classDef mid fill:#fff3e0,stroke:#ef6c00,color:#7f3e00;
     classDef human fill:#e3f2fd,stroke:#1565c0,color:#0d3c78;
-    classDef iface fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
-    classDef ops fill:#fff3e0,stroke:#ef6c00,color:#7f3e00;
     classDef store fill:#f3e5f5,stroke:#6a1b9a,color:#3e0764;
-    classDef ctrl fill:#eceff1,stroke:#546e7a,color:#263238;
-    classDef ext fill:#fafafa,stroke:#616161,color:#212121;
 
-    class THEO,UI human;
-    class CLI iface;
-    class DISC,SCORE,GEN,BUILD ops;
-    class DB,OUT,LOG store;
-    class PROF,CODE ctrl;
-    class SRC,ANT,DRV,EMP ext;
+    class PIPE mid;
+    class OP,UI human;
+    class DB,OUT,APP store;
 ```
 
 Every application lands in `outputs/<user>/{date}_{company}_{role}/`:

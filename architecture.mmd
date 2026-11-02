@@ -1,77 +1,44 @@
-flowchart TB
-    THEO["Theo<br/><i>operator · reviewer · applicant</i>"]
+flowchart TD
+    OP["Operator<br/><i>reviews · edits · submits</i>"]
 
-    subgraph EXT[External systems]
-        DRV["Google Drive / Docs<br/><i>profile files · base PPTX · monthly folders</i>"]
-        SRC["Job sources<br/><i>LinkedIn · ATS boards · Gmail alerts</i>"]
-        ANT["Anthropic API<br/><i>Haiku · Sonnet · Opus · Batches + sync</i>"]
-        EMP["Employer ATS<br/><i>outside the system</i>"]
+    subgraph DRV[Google Drive]
+        direction TB
+        APP["Application packets<br/><i>tailored resume · cover letter</i>"]
+        REF["Living Reference Docs<br/><i>profile · STAR stories · narrative · rubric</i>"]
+        APP ~~~ REF
     end
 
-    subgraph SYS[Local Docker workspace — single user]
-        subgraph IFACE[Interface layer]
-            UI["Streamlit operator console<br/><i>Jobs · Add Job · Stats</i>"]
-            CLI["job-agent CLI<br/><i>batch operations · utilities</i>"]
-        end
+    EMP["Employer ATS"]
+    OP -.->|edits| APP
+    APP -->|submitted manually| EMP
 
-        CODE["Shared Python package<br/><i>direct imports — no separate API service</i>"]
+    UI["Streamlit operator console<br/><i>Jobs · Add Job · Stats</i>"]
+    CLI["job-agent CLI<br/><i>run · generate · doctor · sync-profile</i>"]
+    OP --> UI
+    OP --> CLI
 
-        subgraph OPS[Application operations]
-            BUILD["Artifact builders<br/><i>tailor PPTX · cover-letter Doc</i>"]
-            DISC["Discovery<br/><i>ingest · sweep · prune</i>"]
-            SCORE["Scoring<br/><i>pre-filter · prescreen · score</i>"]
-            GEN["Generation<br/><i>application packet</i>"]
-        end
+    PIPE["Pipeline package<br/><i>discovery · scoring · generation · builders</i>"]
+    UI --> PIPE
+    CLI --> PIPE
 
-        PROF["Profile &amp; source material<br/><i>theo.yaml · rubric · narrative · resumes · STAR · voice</i>"]
+    SRC["Job sources<br/><i>LinkedIn · ATS boards · Gmail</i>"]
+    ANT["Anthropic API<br/><i>Haiku · Sonnet · Opus</i>"]
+    SRC --> PIPE
+    ANT --> PIPE
+    REF -.->|configures| PIPE
 
-        subgraph STATE[State &amp; artifacts]
-            DB[("SQLite — data/jobs.sqlite<br/>User · Job · Score · Application · UserJobMeta")]
-            OUT["outputs/<br/><i>application packets</i>"]
-            LOG["data/runs.log<br/><i>per-stage run records, written by stage wrappers</i>"]
-        end
-    end
-
-    THEO --> UI
-    THEO --> CLI
-    THEO -->|submits manually| EMP
-    UI --> CODE
-    CLI --> CODE
-    CODE --> DISC
-    CODE --> SCORE
-    CODE --> GEN
-    CODE --> BUILD
-
-    PROF -.->|configures| DISC
-    PROF -.->|configures| SCORE
-    PROF -.->|configures| GEN
-
-    SRC --> DISC
-    ANT --> SCORE
-    ANT --> GEN
-    DRV <-->|profile sync| PROF
-    DRV <-->|base PPTX down · documents up| BUILD
-
-    DISC --> DB
-    SCORE --> DB
-    GEN --> DB
-    GEN --> OUT
-    BUILD --> OUT
+    DB[("SQLite DB<br/>jobs · scores · applications")]
+    OUT["Application packet<br/><i>drafts in outputs/</i>"]
+    PIPE --> DB
+    PIPE --> OUT
     DB -.->|materials_path| OUT
+    UI <-->|browse · edit · track| DB
+    OUT -->|final documents| APP
 
-    UI <-.->|browse · edit · track| DB
-    UI -.->|read · download| OUT
-
+    classDef mid fill:#fff3e0,stroke:#ef6c00,color:#7f3e00;
     classDef human fill:#e3f2fd,stroke:#1565c0,color:#0d3c78;
-    classDef iface fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
-    classDef ops fill:#fff3e0,stroke:#ef6c00,color:#7f3e00;
     classDef store fill:#f3e5f5,stroke:#6a1b9a,color:#3e0764;
-    classDef ctrl fill:#eceff1,stroke:#546e7a,color:#263238;
-    classDef ext fill:#fafafa,stroke:#616161,color:#212121;
 
-    class THEO,UI human;
-    class CLI iface;
-    class DISC,SCORE,GEN,BUILD ops;
-    class DB,OUT,LOG store;
-    class PROF,CODE ctrl;
-    class SRC,ANT,DRV,EMP ext;
+    class PIPE mid;
+    class OP,UI human;
+    class DB,OUT,APP store;
