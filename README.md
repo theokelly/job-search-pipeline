@@ -12,7 +12,7 @@ Agentic pipeline for job discovery, fit scoring, and application-material genera
 
 **Generate.** On demand, per job: cover letter (Opus), resume recommendations, application-form answers, and a grounding check that verifies every claim in the letter against your materials. Generation is on-demand because the Opus calls are the expensive part — no point drafting letters for jobs you'll never touch.
 
-![Pipeline flow](flow.png)
+**Diagrams:** the [job-processing funnel](flow.mmd) and the [system architecture](architecture.mmd), both rendered in [OVERVIEW.md](OVERVIEW.md).
 
 Every application lands in `outputs/<user>/{date}_{company}_{role}/`:
 
