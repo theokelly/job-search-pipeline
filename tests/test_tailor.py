@@ -219,8 +219,13 @@ def test_find_or_create_folder_creates():
 
 def test_upload_tailored_pptx(monkeypatch, tmp_path):
     import json as _json
+    from datetime import datetime
     from job_agent import tailor as tailor_mod
-    drive = _FakeDrive(existing_folders={"2026_10": "folder-123"})
+    # upload_tailored_pptx files into the CURRENT month folder — key the fake
+    # to whatever this month is. (A hardcoded "2026_10" broke this test at the
+    # November rollover: the code looked up 2026_11, missed, and created one.)
+    month = datetime.now().strftime("%Y_%m")
+    drive = _FakeDrive(existing_folders={month: "folder-123"})
     # upload_tailored_pptx imports get_google_services from .drive_sync inside
     # the function, so patch it there.
     import job_agent.drive_sync as ds
