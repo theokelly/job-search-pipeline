@@ -6,14 +6,36 @@ Haiku assists per application: pre-drafted application-form answers
 (`grounding_check.md`). Cluster-aware: generates once per cluster for the
 canonical posting and links sibling Applications to the same materials
 directory.
+
+Jobs the user has already moved on from (app_status applied / rejected /
+not_pursuing) are skipped unless `force_all_status` is set — no point
+burning an Opus call on a packet that will never be submitted.
 """
 from pathlib import Path
 from typing import Callable
 
 from ._common import (
     PROFILE_PATH_DEFAULT, _default_echo, init_db, get_session,
-    Job, Score, Application, User, clustering, logged_run,
+    Job, Score, Application, User, UserJobMeta, clustering, logged_run,
 )
+
+# App statuses that mean "already moved on" — bulk generation skips these
+# jobs unless forced. interviewing / offer are deliberately NOT in the set:
+# those applications are still live (and normally have materials already,
+# which excludes them via the Application-row check anyway).
+SKIP_APP_STATUSES = ("applied", "rejected", "not_pursuing")
+
+
+def _statused_job_ids(session, user_id: int) -> set:
+    """Job ids whose app_status marks them moved-on for this user."""
+    from sqlmodel import select
+
+    return set(session.exec(
+        select(UserJobMeta.job_id).where(
+            UserJobMeta.user_id == user_id,
+            UserJobMeta.app_status.in_(SKIP_APP_STATUSES),
+        )
+    ).all())
 
 
 @logged_run("generate")
@@ -22,9 +44,11 @@ def run_generate(
     tiers: str = "Strong Fit",
     profile_path: str = PROFILE_PATH_DEFAULT,
     echo: Callable[[str], None] = _default_echo,
+    force_all_status: bool = False,
 ) -> list:
     """Generate materials for all scored-but-unmaterialized jobs. Returns list
-    of (job, score, out_dir) tuples."""
+    of (job, score, out_dir) tuples. Jobs already marked applied / rejected /
+    not pursuing are skipped unless force_all_status is set."""
     from ..config import load_profile, load_profile_files
     from ..generation.cover_letter import generate_cover_letter
     from ..generation.resume_recommendation import generate_resume_recommendation
@@ -70,6 +94,13 @@ def run_generate(
                 if s.tier in target_tiers:
                     deduped.append(s)
         pending = [s for s in deduped if s.job_id not in existing_app_job_ids]
+        if not force_all_status:
+            moved_on = _statused_job_ids(session, db_user.id)
+            skipped = [s for s in pending if s.job_id in moved_on]
+            if skipped:
+                echo(f"  [generate] skipped {len(skipped)} job(s) already applied / "
+                     f"rejected / not pursuing (pass --force-all-status to include)")
+                pending = [s for s in pending if s.job_id not in moved_on]
         if not pending:
             return outputs
 

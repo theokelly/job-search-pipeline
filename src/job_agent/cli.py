@@ -118,12 +118,13 @@ def score(
 def generate(
     user: str = typer.Option("theo", "--user"),
     tiers: str = typer.Option("Strong Fit", "--tiers", help='Comma-separated tiers. Default: Strong Fit only — generate Worth Reviewing per-job from the UI, or pass --tiers "Strong Fit,Worth Reviewing"'),
+    force_all_status: bool = typer.Option(False, "--force-all-status", help="Also generate for jobs already marked applied / rejected / not pursuing (skipped by default)"),
 ):
     """Generate cover letters and resume recommendations."""
     _bootstrap()
     from .pipeline import run_generate
     typer.echo(f"Generating materials for tiers: {tiers}")
-    outputs = run_generate(user_slug=user, tiers=tiers)
+    outputs = run_generate(user_slug=user, tiers=tiers, force_all_status=force_all_status)
     for job, s, out_dir in outputs:
         typer.echo(f"  {job.company} — {job.title} ({s.tier})")
         typer.echo(f"    → {out_dir}")

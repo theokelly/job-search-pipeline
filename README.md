@@ -163,6 +163,8 @@ job-agent tailor-resume outputs/<user>/<date>_<company>_<role>
 job-agent doctor                            # health check: profile, env, file sync
 ```
 
+Bulk generate skips jobs you've already marked applied / rejected / not pursuing — pass `--force-all-status` to include them.
+
 Prefer a UI? `bash run_ui.sh` starts Streamlit at http://localhost:8501 — review scores, generate materials per job, and tailor resumes from the browser.
 
 ## The profile
