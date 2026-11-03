@@ -1,8 +1,9 @@
 """Discovery stage: fetch new postings from all sources, pre-filter, upsert.
 
 Sources: LinkedIn guest API, Gmail alert ingestion, Greenhouse + Lever +
-Ashby + Workday ATS APIs. Rule-based pre-filter runs before anything is
-saved; JD backfill fills in descriptions for LinkedIn jobs missing them.
+Ashby + Workday ATS APIs, and search fan-out (job-first, any company, via
+--fanout). Rule-based pre-filter runs before anything is saved; JD backfill
+fills in descriptions for LinkedIn jobs missing them.
 
 Imports inside functions are lazy so that `job-agent --help` and
 short-running commands don't pay the full import cost.
@@ -22,6 +23,7 @@ def run_discover(
     include_email: bool = False,
     email_days: int = 14,
     include_linkedin: bool = False,
+    include_fanout: bool = False,
     refetch_jds: bool = False,
     profile_path: str = PROFILE_PATH_DEFAULT,
     echo: Callable[[str], None] = _default_echo,
@@ -48,7 +50,7 @@ def run_discover(
     if priority:
         companies = [c for c in companies if c.get("priority") == priority]
 
-    counts = {"found": 0, "passed": 0, "new": 0, "updated": 0, "skipped": 0, "errors": 0}
+    counts = {"found": 0, "passed": 0, "new": 0, "updated": 0, "skipped": 0, "dupes": 0, "errors": 0}
     results: list = []
     error_details: list[str] = []
 
@@ -68,6 +70,31 @@ def run_discover(
                     sql_select(Job).where(Job.description_raw != "")
                 ).all()
             }
+
+    # Canonical-URL set for cross-source dedupe. Fan-out jobs are identified
+    # by URL first (their company/title/location strings can differ from the
+    # board copy of the same posting, which would defeat the job_id hash).
+    # Seeded from the DB; every source's keeps claim their URL so a later
+    # source in the same run cannot re-add the same posting.
+    seen_urls: set[str] = set()
+    fanout_kept: list = []
+    _canon_url = None
+    if include_fanout:
+        from ..discovery.fanout import normalize_url as _canon_url_fn
+
+        _canon_url = _canon_url_fn
+        with get_session() as _s:
+            seen_urls = {_canon_url(j.url) for j in _s.exec(sql_select(Job)).all() if j.url}
+
+    def _claim(job) -> bool:
+        """True when this job's canonical URL is new; claims it when so."""
+        if _canon_url is None:
+            return True
+        canon = _canon_url(job.url)
+        if not canon or canon in seen_urls:
+            return not canon
+        seen_urls.add(canon)
+        return True
 
     # LinkedIn guest API search (keyword-based, fetches full JDs)
     if include_linkedin:
@@ -92,6 +119,10 @@ def run_discover(
                     if not keep:
                         counts["skipped"] += 1
                         results.append(("skip", job, reason))
+                    elif not _claim(job):
+                        counts["dupes"] += 1
+                        counts["skipped"] += 1
+                        results.append(("skip", job, "duplicate URL (cross-source)"))
                     else:
                         counts["passed"] += 1
                         results.append(("keep", job, None))
@@ -114,6 +145,10 @@ def run_discover(
                 if not keep:
                     counts["skipped"] += 1
                     results.append(("skip", job, reason))
+                elif not _claim(job):
+                    counts["dupes"] += 1
+                    counts["skipped"] += 1
+                    results.append(("skip", job, "duplicate URL (cross-source)"))
                 else:
                     counts["passed"] += 1
                     results.append(("keep", job, None))
@@ -121,6 +156,40 @@ def run_discover(
             _note_error("email (skipped)", e)
         except Exception as e:
             _note_error("email", e)
+
+    # Search fan-out (job-first: ATS domains x title phrases, any company)
+    if include_fanout:
+        try:
+            from ..discovery.fanout import fetch_jobs as fanout_fetch
+
+            echo("  [fanout] searching ATS domains for profile title phrases...")
+            fo_jobs, fo_stats = fanout_fetch(profile)
+            echo(
+                f"  [fanout] {fo_stats['queries']} queries, {fo_stats['results']} results, "
+                f"{fo_stats['candidates']} candidates, {fo_stats['gated_out']} gated out, "
+                f"fetched {fo_stats['fetched']}, {fo_stats['gone']} no longer live, "
+                f"{fo_stats['extract_failed']} extraction failures"
+            )
+            for err in fo_stats.get("errors", []):
+                _note_error("fanout", RuntimeError(err))
+            for job in fo_jobs:
+                counts["found"] += 1
+                keep, reason = pre_filter(job, profile)
+                if not keep:
+                    counts["skipped"] += 1
+                    results.append(("skip", job, reason))
+                elif not _claim(job):
+                    counts["dupes"] += 1
+                    counts["skipped"] += 1
+                    results.append(("skip", job, "duplicate URL (cross-source)"))
+                else:
+                    counts["passed"] += 1
+                    results.append(("keep", job, None))
+                    fanout_kept.append(job)
+        except EnvironmentError as e:
+            _note_error("fanout (skipped)", e)
+        except Exception as e:
+            _note_error("fanout", e)
 
     total_boards = sum(
         1 for c in companies
@@ -171,9 +240,38 @@ def run_discover(
                 counts["skipped"] += 1
                 results.append(("skip", job, reason))
                 continue
+            if not _claim(job):
+                counts["dupes"] += 1
+                counts["skipped"] += 1
+                results.append(("skip", job, "duplicate URL (cross-source)"))
+                continue
 
             counts["passed"] += 1
             results.append(("keep", job, None))
+
+    # Auto-promotion suggestions (suggest-only: the profile is never edited
+    # by a run). A kept fan-out role from an unlisted company is evidence
+    # that company's board belongs in target_companies, where the board API
+    # gives fresher, complete coverage than the search index.
+    if include_fanout and fanout_kept:
+        from ..discovery.fanout import parse_ats_url
+
+        listed = {
+            (c.get("name") or "").lower()
+            for c in profile.get("target_companies", [])
+        }
+        by_company: dict[str, list] = {}
+        for job in fanout_kept:
+            if job.company.lower() not in listed:
+                by_company.setdefault(job.company, []).append(job)
+        for company_name, cjobs in sorted(by_company.items()):
+            parsed = parse_ats_url(cjobs[0].url)
+            board_note = f" — board: {parsed[0]} {parsed[1]}" if parsed else ""
+            echo(
+                f"  [fanout] unlisted company: {company_name} "
+                f"({len(cjobs)} kept role(s)){board_note} — consider adding "
+                f"it to target_companies"
+            )
 
     if not dry_run:
         echo(f"  [discover] saving {counts['passed']} jobs to DB...")

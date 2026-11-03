@@ -45,7 +45,18 @@ def normalize_lever(company: str, raw: dict) -> Job:
 
 def normalize_ashby(company: str, raw: dict) -> Job:
     title = raw.get("title", "")
-    location = raw.get("locationName", "") or ""
+    # The posting API's current shape uses `location` (a string) plus
+    # `secondaryLocations`; `locationName` is the retired field and is kept
+    # only as a fallback for cached payloads and old test fixtures.
+    location = raw.get("location") or raw.get("locationName") or ""
+    secondary = [
+        s.get("location", "")
+        for s in raw.get("secondaryLocations") or []
+        if isinstance(s, dict)
+    ]
+    secondary = [s for s in secondary if s]
+    if secondary:
+        location = "; ".join([location, *secondary]) if location else "; ".join(secondary)
     if raw.get("isRemote") and "remote" not in location.lower():
         location = f"{location} (Remote)".strip()
     url = raw.get("jobUrl", "")
@@ -78,6 +89,33 @@ def normalize_workday(company: str, host: str, site: str, posting: dict, detail:
     return Job(
         id=job_id(company, title, location),
         source="workday_api",
+        company=company,
+        title=title,
+        location=location,
+        url=url,
+        description_raw=description,
+        first_seen=now,
+        last_seen=now,
+        status="active",
+    )
+
+
+def normalize_fanout(extracted: dict) -> Job:
+    """Build a Job from a manual.fetch_from_url extraction dict.
+
+    Used by fan-out discovery for postings that are not on a recognized ATS
+    (where no structured normalizer exists). Mirrors how the Streamlit
+    Add-a-job flow builds Jobs from the same dict, with source search_fanout.
+    """
+    company = (extracted.get("company") or "Unknown").strip()
+    title = (extracted.get("title") or "").strip()
+    location = (extracted.get("location") or "").strip()
+    url = (extracted.get("url") or "").strip()
+    description = extracted.get("description") or ""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return Job(
+        id=job_id(company, title, location),
+        source="search_fanout",
         company=company,
         title=title,
         location=location,

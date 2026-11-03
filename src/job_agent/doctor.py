@@ -164,6 +164,25 @@ def check_resume_sync(report: Report) -> None:
                        "Extract one with scripts/extract_resume.py")
 
 
+def check_fanout(report: Report, profile: dict | None) -> None:
+    """Fan-out is optional, but if the profile configures it, its Brave key
+    should be present — otherwise every --fanout run notes a skip error."""
+    fanout = (profile or {}).get("fanout")
+    if not fanout:
+        report.add("info", "fanout", "Fan-out discovery not configured (optional; add a fanout block to theo.yaml)")
+        return
+    provider = (fanout.get("provider") or "brave").lower()
+    if provider != "brave":
+        report.add("warning", "fanout", f"Unsupported fanout provider '{provider}'", "Only 'brave' is implemented")
+        return
+    if os.environ.get("BRAVE_API_KEY") or os.environ.get("BRAVE_SEARCH_API_KEY"):
+        report.add("info", "fanout", "Fan-out configured (Brave), API key present")
+    else:
+        report.add("warning", "fanout",
+                   "Fan-out configured (Brave) but no API key in the environment",
+                   "Add BRAVE_API_KEY to .env in the repo root — create the key at https://api-dashboard.search.brave.com")
+
+
 def check_application_answers(report: Report, profile: dict | None) -> None:
     """The application_answers block is optional, but an empty one means every
 generated answers.md will be full of TODO markers. Nudge, don't fail."""
@@ -211,6 +230,7 @@ def run_doctor() -> int:
     check_generation_files(report)
     check_resume_sync(report)
     check_drive(report, profile)
+    check_fanout(report, profile)
     check_application_answers(report, profile)
 
     print("\n=== job-agent doctor ===")

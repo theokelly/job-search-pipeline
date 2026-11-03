@@ -197,6 +197,17 @@ _PROFILE_SPEC: dict[str, object] = {
         "location": (str, type(None)),
         "company_id": (str, type(None)),
     }],
+    "fanout": {
+        "enabled_by_default": bool,
+        "provider": str,
+        "results_per_query": int,
+        "max_candidate_urls": int,
+        "max_fetches": int,
+        "domains": [str],
+        "phrase_domains": [str],
+        "phrase_count": int,
+        "title_phrases": [str],
+    },
     "pre_filter_terms": [str],
     "title_filter_terms": [str],
     "dealbreakers": {

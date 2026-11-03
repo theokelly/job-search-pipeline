@@ -94,6 +94,42 @@ def batches_config(profile: dict) -> dict:
     return _section(profile, "batches", _DEFAULT_BATCHES)
 
 
+_DEFAULT_FANOUT: dict[str, Any] = {
+    "enabled_by_default": False,
+    "provider": "brave",
+    "results_per_query": 10,
+    "max_candidate_urls": 200,
+    "max_fetches": 60,
+    "domains": [
+        "jobs.ashbyhq.com",
+        "job-boards.greenhouse.io",
+        "boards.greenhouse.io",
+        "jobs.lever.co",
+        "recruitee.com",
+        "apply.workable.com",
+        "jobs.smartrecruiters.com",
+        "teamtailor.com",
+        "jobs.personio.com",
+    ],
+    "phrase_domains": ["jobs.ashbyhq.com", "job-boards.greenhouse.io"],
+    "phrase_count": 3,
+    "title_phrases": [
+        "Head of AI",
+        "AI Enablement Lead",
+        "AI Adoption Lead",
+        "AI Transformation Lead",
+        "Director of AI",
+        "AI Platform Lead",
+        "Head of Data and AI",
+    ],
+}
+
+
+def fanout_config(profile: dict) -> dict:
+    """Fan-out discovery config (profile `fanout:` block, defaults above)."""
+    return _section(profile, "fanout", _DEFAULT_FANOUT)
+
+
 def prescreen_config(profile: dict) -> dict:
     """Returns {persona, geography_rules, reject_signals}. Defaults are empty
     strings / lists so prescreen falls back gracefully if not configured."""

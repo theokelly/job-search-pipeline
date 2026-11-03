@@ -27,6 +27,32 @@ def _print_discover_summary(counts: dict, dry_run: bool, indent: str = "") -> No
         typer.echo(f"{indent}  ! {detail}")
 
 
+def _print_scored_summary(results: list, indent: str = "", detail: bool = False) -> None:
+    """One line per cluster, not per posting.
+
+    run_score returns one (job, score) per scored row, including cluster
+    siblings that received the canonical's replicated score — printing every
+    row makes a multi-geo posting look like it was scored repeatedly. Group
+    by cluster key and note the sibling count instead. All members of a
+    cluster share one tier within a run by construction (replication).
+    """
+    from .clustering import cluster_key
+
+    clusters: dict[str, list] = {}
+    for job, s in results:
+        clusters.setdefault(cluster_key(job), []).append((job, s))
+    for members in clusters.values():
+        job, s = members[0]
+        siblings = len(members) - 1
+        note = f" (+{siblings} sibling posting{'s' if siblings != 1 else ''})" if siblings else ""
+        if detail:
+            typer.echo(f"{indent}{job.company} — {job.title}{note}")
+            typer.echo(f"{indent}  → {s.tier} (skill={s.skill_fit}, pref={s.preference_alignment})")
+        else:
+            typer.echo(f"{indent}{job.company} — {job.title} → {s.tier}{note}")
+    typer.echo(f"{indent}Scored {len(results)} jobs in {len(clusters)} cluster(s).")
+
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -38,9 +64,10 @@ def discover(
     email: bool = typer.Option(False, "--email", help="Include Gmail alert ingestion"),
     email_days: int = typer.Option(14, "--email-days", help="How many days back to scan alert emails (use 365 for first-time backfill)"),
     linkedin: bool = typer.Option(False, "--linkedin", help="Search LinkedIn via guest API (slower, fetches full JDs)"),
+    fanout: bool = typer.Option(False, "--fanout", help="Search fan-out: title-phrase search across ATS domains (any company, not just listed ones)"),
     refetch_jds: bool = typer.Option(False, "--refetch-jds", help="Re-fetch JDs for jobs already in the DB (LinkedIn + email). Use after fixing a fetch bug."),
 ):
-    """Fetch new job postings from ATS APIs (Greenhouse, Lever, Ashby, Workday), and optionally Gmail alerts or LinkedIn search."""
+    """Fetch new job postings from ATS APIs (Greenhouse, Lever, Ashby, Workday), and optionally Gmail alerts, LinkedIn search, or search fan-out."""
     _bootstrap()
     from .pipeline import run_discover
     counts, results = run_discover(
@@ -49,6 +76,7 @@ def discover(
         include_email=email,
         email_days=email_days,
         include_linkedin=linkedin,
+        include_fanout=fanout,
         refetch_jds=refetch_jds,
     )
 
@@ -108,10 +136,8 @@ def score(
         rescore=rescore, use_batch=batch,
         rescore_tiers=[t.strip() for t in rescore_tiers.split(",")] if rescore_tiers else None,
     )
-    for job, s in results:
-        typer.echo(f"  {job.company} — {job.title}")
-        typer.echo(f"    → {s.tier} (skill={s.skill_fit}, pref={s.preference_alignment})")
-    typer.echo(f"\nScored {len(results)} jobs.")
+    typer.echo()
+    _print_scored_summary(results, indent="  ", detail=True)
 
 
 @app.command()
@@ -138,6 +164,7 @@ def run(
     prescreen: bool = typer.Option(True, "--prescreen/--no-prescreen", help="Run Haiku pre-filter before Sonnet scoring (default: on)"),
     rescore: bool = typer.Option(False, "--rescore", help="Also re-score jobs that already have a Score"),
     linkedin: bool = typer.Option(False, "--linkedin", help="Search LinkedIn via guest API"),
+    fanout: Optional[bool] = typer.Option(None, "--fanout/--no-fanout", help="Search fan-out across ATS domains (default from yaml: fanout.enabled_by_default)"),
     email: bool = typer.Option(False, "--email", help="Include Gmail alert ingestion"),
     email_days: int = typer.Option(14, "--email-days", help="How many days back to scan alert emails"),
     refetch_jds: bool = typer.Option(False, "--refetch-jds", help="Re-fetch JDs for jobs already in the DB"),
@@ -152,6 +179,8 @@ def run(
 
     profile = load_profile("profile/theo.yaml")
     pipe_cfg = settings.pipeline_config(profile)
+    if fanout is None:
+        fanout = settings.fanout_config(profile).get("enabled_by_default", False)
 
     if pipe_cfg.get("auto_sweep_on_run", True) and not dry_run:
         typer.echo("=== Step 0/2: Sweep stale postings ===")
@@ -159,8 +188,8 @@ def run(
 
     typer.echo("=== Step 1/2: Discover ===")
     counts, _ = run_discover(
-        dry_run=dry_run, include_linkedin=linkedin, include_email=email,
-        email_days=email_days, refetch_jds=refetch_jds,
+        dry_run=dry_run, include_linkedin=linkedin, include_fanout=fanout,
+        include_email=email, email_days=email_days, refetch_jds=refetch_jds,
     )
     _print_discover_summary(counts, dry_run, indent="  ")
 
@@ -174,9 +203,7 @@ def run(
 
     typer.echo("\n=== Step 2/2: Score ===")
     scored = run_score(user_slug=user, prescreen=prescreen, rescore=rescore, use_batch=batch)
-    for job, s in scored:
-        typer.echo(f"  {job.company} — {job.title} → {s.tier}")
-    typer.echo(f"  Scored {len(scored)} jobs.")
+    _print_scored_summary(scored, indent="  ")
 
     typer.echo("\nPipeline complete. Generate materials on demand: per-job in the UI or `job-agent generate`.")
 

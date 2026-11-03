@@ -3,11 +3,15 @@ from job_agent.discovery.normalizer import normalize_ashby
 from job_agent.discovery import ashby
 
 
+# Current Ashby posting-API shape (checked live 2026-11-02): the primary
+# location is `location` (a string), eligible extra locations live in
+# `secondaryLocations`, and there is no `locationName` field anymore.
 RAW = {
     "id": "abc123",
     "title": "Senior Data Scientist",
     "departmentName": "Data",
-    "locationName": "Amsterdam, Netherlands",
+    "location": "Amsterdam, Netherlands",
+    "secondaryLocations": [],
     "workplaceType": "hybrid",
     "isRemote": False,
     "descriptionHtml": "<h2>About the role</h2><p>We need a data scientist.</p>",
@@ -28,8 +32,27 @@ def test_normalize_ashby():
 
 
 def test_normalize_ashby_remote_location():
-    raw = dict(RAW, locationName="", isRemote=True)
+    raw = dict(RAW, location="", isRemote=True)
     job = normalize_ashby("Acme", raw)
+    assert "remote" in job.location.lower()
+
+
+def test_normalize_ashby_secondary_locations():
+    # The n8n shape: primary location is the HQ office, the candidate's
+    # eligible country (Netherlands) is a secondary location. The pre-filter
+    # can only see that eligibility if the normalizer keeps it.
+    raw = dict(
+        RAW,
+        location="Berlin Office",
+        isRemote=True,
+        secondaryLocations=[
+            {"location": "Netherlands", "address": {"postalAddress": {"addressCountry": "Netherlands"}}},
+            {"location": "Germany", "address": {"postalAddress": {"addressCountry": "Germany"}}},
+        ],
+    )
+    job = normalize_ashby("Acme", raw)
+    assert "Berlin Office" in job.location
+    assert "Netherlands" in job.location
     assert "remote" in job.location.lower()
 
 
