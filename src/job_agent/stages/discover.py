@@ -163,10 +163,11 @@ def run_discover(
             from ..discovery.fanout import fetch_jobs as fanout_fetch
 
             echo("  [fanout] searching ATS domains for profile title phrases...")
-            fo_jobs, fo_stats = fanout_fetch(profile)
+            fo_jobs, fo_stats = fanout_fetch(profile, known_urls=seen_urls)
             echo(
                 f"  [fanout] {fo_stats['queries']} queries, {fo_stats['results']} results, "
                 f"{fo_stats['candidates']} candidates, {fo_stats['gated_out']} gated out, "
+                f"{fo_stats['known_skipped']} already known, {fo_stats['dead_skipped']} known dead, "
                 f"fetched {fo_stats['fetched']}, {fo_stats['gone']} no longer live, "
                 f"{fo_stats['extract_failed']} extraction failures"
             )

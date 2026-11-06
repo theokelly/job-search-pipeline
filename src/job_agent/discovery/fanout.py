@@ -13,15 +13,22 @@ Design spec: fanout-discovery-design-spec-2026-11-02 (goal workspace).
 Provider: Brave Search API via search_provider (profile `fanout:` block).
 """
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 
 import httpx
+from sqlmodel import select
 
 from .. import settings
-from ..db import Job
+from ..db import FanoutDeadUrl, Job, get_session
 from . import search_provider
 from .normalizer import normalize_fanout, normalize_greenhouse, normalize_lever
+
+
+class PostingGone(Exception):
+    """The ATS itself says this posting no longer exists (an Ashby board
+    that no longer lists it). Counted as `gone`, like an API 404."""
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +137,10 @@ def _company_from_slug(slug: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _fetch_ats_job(kind: str, board: str, posting_id: str) -> Optional[Job]:
-    """Fetch one posting through its ATS's own API. None when not found."""
+    """Fetch one posting through its ATS's own API.
+
+    Raises PostingGone when the board is live but the posting is not on
+    it (Ashby); Greenhouse/Lever signal the same state as an HTTP 404."""
     company = _company_from_slug(board)
     if kind == "ashby":
         from .ashby import fetch_jobs as ashby_fetch
@@ -138,7 +148,7 @@ def _fetch_ats_job(kind: str, board: str, posting_id: str) -> Optional[Job]:
         for job in ashby_fetch(company, board):
             if posting_id in job.url:
                 return job
-        return None
+        raise PostingGone(f"ashby board '{board}' no longer lists {posting_id}")
     if kind == "greenhouse":
         url = f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{posting_id}"
         resp = httpx.get(url, params={"content": "true"}, timeout=15)
@@ -157,7 +167,8 @@ def fetch_job_from_url(url: str) -> Optional[Job]:
 
     Recognized ATS URLs go through the ATS API (structured fields, canonical
     location); everything else falls back to the manual.fetch_from_url
-    cascade. Returns None when extraction yields no usable title/description.
+    cascade. Returns None when extraction yields no usable title/description;
+    raises PostingGone when a recognized ATS reports the posting is gone.
     """
     parsed = parse_ats_url(url)
     if parsed:
@@ -171,15 +182,72 @@ def fetch_job_from_url(url: str) -> Optional[Job]:
 
 
 # ---------------------------------------------------------------------------
+# Fetch gates: page-age ordering + persisted gone verdicts
+# ---------------------------------------------------------------------------
+
+def _page_age_dt(value) -> Optional[datetime]:
+    """Parse a Brave `page_age` value into a naive UTC datetime.
+
+    Brave returns ISO timestamps (sometimes with a 'Z' or offset); anything
+    unparseable is undated (None), which sorts last in fetch order."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _load_dead_urls(ttl_days: int) -> set:
+    """Canonical URLs recorded as gone within the TTL. Best-effort: any DB
+    problem yields an empty set — the gate must never break discovery."""
+    try:
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=ttl_days)
+        with get_session() as session:
+            rows = session.exec(
+                select(FanoutDeadUrl).where(FanoutDeadUrl.last_seen >= cutoff)
+            ).all()
+            return {r.url for r in rows}
+    except Exception:
+        return set()
+
+
+def _record_dead_urls(urls: list) -> None:
+    """Persist gone verdicts for canonical URLs. Best-effort, like the load."""
+    try:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        with get_session() as session:
+            for url in urls:
+                row = session.get(FanoutDeadUrl, url)
+                if row is None:
+                    session.add(FanoutDeadUrl(url=url, last_seen=now))
+                else:
+                    row.last_seen = now
+                    session.add(row)
+            session.commit()
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Main entry point (called from stages/discover.py)
 # ---------------------------------------------------------------------------
 
-def fetch_jobs(profile: dict) -> tuple[list[Job], dict]:
+def fetch_jobs(profile: dict, known_urls: Optional[set] = None) -> tuple[list[Job], dict]:
     """Run fan-out for one discover pass. Returns (jobs, stats).
 
     Raises EnvironmentError when the search provider is not configured, so
     run_discover can note it and continue with the other sources, matching
     the email path's behavior.
+
+    Candidates are gated before any fetch: canonical URLs in known_urls
+    (already in the jobs DB, seeded by run_discover) and URLs recorded as
+    gone within the dead-URL TTL are skipped, and the rest are fetched
+    freshest-indexed first, so the fetch cap goes to the likeliest-live
+    postings.
     """
     cfg = settings.fanout_config(profile)
     provider = (cfg.get("provider") or "brave").lower()
@@ -191,8 +259,11 @@ def fetch_jobs(profile: dict) -> tuple[list[Job], dict]:
     queries = build_queries(cfg)
     stats = {
         "queries": len(queries), "results": 0, "candidates": 0,
-        "gated_out": 0, "fetched": 0, "gone": 0, "extract_failed": 0, "errors": [],
+        "gated_out": 0, "known_skipped": 0, "dead_skipped": 0,
+        "fetched": 0, "gone": 0, "extract_failed": 0, "errors": [],
     }
+    known = known_urls or set()
+    dead = _load_dead_urls(int(cfg.get("dead_url_ttl_days") or 30))
 
     # Collect candidate URLs across all queries, deduped by canonical URL.
     candidates: dict[str, dict] = {}
@@ -208,13 +279,36 @@ def fetch_jobs(profile: dict) -> tuple[list[Job], dict]:
         for r in results:
             if not r.get("url"):
                 continue
-            candidates.setdefault(normalize_url(r["url"]), r)
+            canon = normalize_url(r["url"])
+            existing = candidates.get(canon)
+            # Keep the freshest copy of a posting's metadata: Brave can
+            # return the same URL from several queries with different
+            # crawl ages, and the freshest copy drives fetch ordering.
+            if existing is None or (
+                (_page_age_dt(r.get("page_age")) or datetime.min)
+                > (_page_age_dt(existing.get("page_age")) or datetime.min)
+            ):
+                candidates[canon] = r
     stats["candidates"] = len(candidates)
 
     max_urls = int(cfg.get("max_candidate_urls") or 200)
     max_fetches = int(cfg.get("max_fetches") or 60)
     jobs: list[Job] = []
-    for canon, result in list(candidates.items())[:max_urls]:
+    gone_urls: list[str] = []
+    # Freshest-indexed first: the fetch cap should be spent on postings
+    # the index saw recently; undated results go last.
+    ordered = sorted(
+        candidates.items(),
+        key=lambda kv: _page_age_dt(kv[1].get("page_age")) or datetime.min,
+        reverse=True,
+    )
+    for canon, result in ordered[:max_urls]:
+        if canon in known:
+            stats["known_skipped"] += 1
+            continue
+        if canon in dead:
+            stats["dead_skipped"] += 1
+            continue
         title = result.get("title", "")
         if title and not title_matches(title, phrases):
             stats["gated_out"] += 1
@@ -225,6 +319,11 @@ def fetch_jobs(profile: dict) -> tuple[list[Job], dict]:
         gone = False
         try:
             job = fetch_job_from_url(result["url"])
+        except PostingGone:
+            stats["gone"] += 1
+            gone = True
+            gone_urls.append(canon)
+            job = None
         except httpx.HTTPStatusError as e:
             # A 404 from the ATS's own API means the posting was live when
             # the search index crawled it and has since closed. That is
@@ -233,6 +332,7 @@ def fetch_jobs(profile: dict) -> tuple[list[Job], dict]:
             if e.response is not None and e.response.status_code == 404:
                 stats["gone"] += 1
                 gone = True
+                gone_urls.append(canon)
             else:
                 stats["errors"].append(f"[{result['url']}] {e}")
             job = None
@@ -247,4 +347,6 @@ def fetch_jobs(profile: dict) -> tuple[list[Job], dict]:
         job.source = "search_fanout"
         job.url = canon
         jobs.append(job)
+    if gone_urls:
+        _record_dead_urls(gone_urls)
     return jobs, stats

@@ -79,6 +79,15 @@ class UserJobMeta(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_utcnow)
 
 
+class FanoutDeadUrl(SQLModel, table=True):
+    """A fan-out candidate URL the ATS itself reported as gone (an API 404,
+    or an Ashby board that no longer lists the posting). Persisted so later
+    fan-out runs skip re-fetching it until the fanout dead-URL TTL expires
+    (a repost usually carries a new posting ID, hence a new URL)."""
+    url: str = Field(primary_key=True)
+    last_seen: datetime = Field(default_factory=_utcnow)
+
+
 _engine = None
 
 

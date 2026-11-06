@@ -12,8 +12,9 @@ Setup (one-time):
      BRAVE_SEARCH_API_KEY is accepted as a fallback name.
 
 The provider surface is deliberately tiny — search(query, num) returning
-[{title, url, snippet}] — so another provider can replace Brave without
-touching fanout.py. Auth uses the X-Subscription-Token header; the key is
+[{title, url, snippet, page_age}] — so another provider can replace Brave
+without touching fanout.py. page_age is Brave's crawl timestamp for the
+result (ISO string or None); fanout uses it to order fetches freshest-first. Auth uses the X-Subscription-Token header; the key is
 never logged.
 """
 import os
@@ -36,7 +37,7 @@ def _api_key() -> str:
 
 
 def search(query: str, num: int = 10) -> list[dict]:
-    """Run one Brave web search. Returns [{title, url, snippet}, ...].
+    """Run one Brave web search. Returns [{title, url, snippet, page_age}, ...].
 
     `num` maps to Brave's `count` parameter (1-20 per request).
     Raises EnvironmentError when no API key is configured, matching how
@@ -59,6 +60,7 @@ def search(query: str, num: int = 10) -> list[dict]:
             "title": r.get("title", "") or "",
             "url": r.get("url", "") or "",
             "snippet": r.get("description", "") or "",
+            "page_age": r.get("page_age"),
         }
         for r in results
     ]

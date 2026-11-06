@@ -100,6 +100,7 @@ _DEFAULT_FANOUT: dict[str, Any] = {
     "results_per_query": 10,
     "max_candidate_urls": 200,
     "max_fetches": 60,
+    "dead_url_ttl_days": 30,
     "domains": [
         "jobs.ashbyhq.com",
         "job-boards.greenhouse.io",
