@@ -21,7 +21,7 @@ from . import settings
 from .db import Job, Score
 from .scoring.prompt import build_scoring_messages, SCORE_TOOL
 from .scoring.prescreen import build_prescreen_prompt, parse_prescreen_response
-from .scoring.score import _score_from_tool_input
+from .scoring.score import _score_from_tool_input, missing_score_fields, score_job
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ def submit_score_batch(jobs: list[Job], profile: dict, narrative_guidance: str) 
                 "model": model,
                 "max_tokens": 1024,
                 "tools": [SCORE_TOOL],
-                "tool_choice": {"type": "tool", "name": "record_score"},
+                "tool_choice": {"type": "auto"},
                 "messages": build_scoring_messages(job, profile, narrative_guidance),
             },
         })
@@ -148,8 +148,15 @@ def collect_prescreen_results(batch_id: str, jobs_by_id: dict[str, Job]) -> list
     return out
 
 
-def collect_score_results(batch_id: str, jobs_by_id: dict[str, Job], user_id: int) -> list[tuple[Job, Score]]:
-    """Returns [(job, Score), ...]. Errored entries are dropped (logged elsewhere)."""
+def collect_score_results(batch_id: str, jobs_by_id: dict[str, Job], user_id: int,
+                          profile: dict | None = None,
+                          narrative_guidance: str = "") -> list[tuple[Job, Score]]:
+    """Returns [(job, Score), ...]. Errored entries are dropped (logged elsewhere).
+
+    Entries whose tool payload is missing or incomplete (possible since
+    scoring moved to tool_choice="auto") are retried through the sync
+    score_job path when profile is provided; a failure there drops the
+    entry, leaving the job unscored for the next run."""
     out: list[tuple[Job, Score]] = []
     for entry in iter_results(batch_id):
         custom_id = entry.custom_id
@@ -165,7 +172,13 @@ def collect_score_results(batch_id: str, jobs_by_id: dict[str, Job], user_id: in
             if getattr(block, "type", None) == "tool_use":
                 tool_use = block
                 break
-        if tool_use is None:
+        if tool_use is None or missing_score_fields(tool_use.input):
+            if profile is None:
+                continue
+            try:
+                out.append((job, score_job(job, user_id, profile, narrative_guidance)))
+            except Exception:
+                continue
             continue
         score = _score_from_tool_input(job, user_id, tool_use.input)
         out.append((job, score))

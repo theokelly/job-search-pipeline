@@ -13,16 +13,16 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 _DEFAULT_MODELS: dict[str, Any] = {
-    "prescreen": "claude-haiku-4-5-20251001",
-    "score": "claude-sonnet-4-6",
-    "resume_recommendation": "claude-haiku-4-5-20251001",
+    "prescreen": "claude-haiku-5-5",
+    "score": "claude-sonnet-5-5",
+    "resume_recommendation": "claude-haiku-5-5",
     "cover_letter_by_tier": {
-        "Strong Fit": "claude-opus-4-7",
-        "Worth Reviewing": "claude-sonnet-4-6",
+        "Strong Fit": "claude-opus-5-5",
+        "Worth Reviewing": "claude-sonnet-5-5",
     },
-    "cover_letter_default": "claude-sonnet-4-6",
-    "application_answers": "claude-haiku-4-5-20251001",
-    "truthfulness_check": "claude-haiku-4-5-20251001",
+    "cover_letter_default": "claude-sonnet-5-5",
+    "application_answers": "claude-haiku-5-5",
+    "truthfulness_check": "claude-haiku-5-5",
 }
 
 _DEFAULT_TRUNCATION: dict[str, int] = {

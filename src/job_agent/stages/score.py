@@ -322,7 +322,8 @@ def _score_batch(
         echo(f"  [score] batch_id={batch_id}; polling...")
         poll_until_ended(batch_id, profile, on_tick=lambda s: echo(f"    [batch] {s}"))
         scored: list = []
-        for canonical, score in collect_score_results(batch_id, jobs_by_id, user_id):
+        for canonical, score in collect_score_results(
+                batch_id, jobs_by_id, user_id, profile=profile, narrative_guidance=narrative):
             siblings = replications.get(canonical.id, [canonical])
             for sib in siblings:
                 copy = score if sib.id == canonical.id else _replicate_score(score, sib.id)
@@ -360,12 +361,13 @@ def fetch_score_batch(
     Replicates each canonical's score to its cluster siblings, mirroring the
     sync path (previously batch-fetch left siblings unscored).
     """
-    from ..config import load_profile
+    from ..config import load_profile, load_text
     from ..batches import iter_results
-    from ..scoring.score import _score_from_tool_input
+    from ..scoring.score import _score_from_tool_input, missing_score_fields, score_job
     from sqlmodel import select
 
     profile = load_profile(profile_path)
+    narrative = load_text(NARRATIVE_PATH)
     init_db()
     saved = 0
     scored: list[tuple[Job, Score]] = []
@@ -386,9 +388,16 @@ def fetch_score_batch(
                 if getattr(block, "type", None) == "tool_use":
                     tool_use = block
                     break
-            if tool_use is None:
-                continue
-            score = _score_from_tool_input(job, db_user.id, tool_use.input)
+            if tool_use is None or missing_score_fields(tool_use.input):
+                # Auto tool_choice can't guarantee a complete payload; retry
+                # through the sync path (validates + retries). A failure
+                # leaves the job unscored for the next run.
+                try:
+                    score = score_job(job, db_user.id, profile, narrative)
+                except Exception:
+                    continue
+            else:
+                score = _score_from_tool_input(job, db_user.id, tool_use.input)
             session.add(score)
             scored.append((job, score))
             saved += 1
