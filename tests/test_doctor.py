@@ -1,20 +1,9 @@
 import os
 import pytest
+from job_agent import resume_mirror
 from job_agent.doctor import (
-    Report, _parse_source_pptx, _md_title,
-    check_env, check_profile, run_doctor,
+    Report, check_env, check_profile, check_resume_sync, run_doctor,
 )
-
-
-def test_parse_source_pptx():
-    md = "> Source: `TheoKelly_CV_Amsterdam.pptx` (in this folder; synced 2026-10-06). blah"
-    assert _parse_source_pptx(md) == "TheoKelly_CV_Amsterdam.pptx"
-    assert _parse_source_pptx("# Just a title\n\nno source note") is None
-
-
-def test_md_title():
-    assert _md_title("# Theo Kelly\n\nbody") == "Theo Kelly"
-    assert _md_title("no h1 here") is None
 
 
 def test_report_has_errors():
@@ -43,9 +32,9 @@ def test_check_env_key_present(monkeypatch, tmp_path):
 
 
 def _write_profile(tmp_path, content):
-    pdir = tmp_path / "profile" / "resume_versions"
-    pdir.mkdir(parents=True)
+    (tmp_path / "profile").mkdir(parents=True)
     (tmp_path / "profile" / "theo.yaml").write_text(content)
+    (tmp_path / "profile" / "resume_base.md").write_text("# Resume Base\n")
 
 
 def test_check_profile_valid(monkeypatch, tmp_path):
@@ -64,12 +53,51 @@ def test_check_profile_invalid(monkeypatch, tmp_path):
     assert r.has_errors
 
 
+def _profile_with_base():
+    return {"tailoring": {"base_pptx_drive_id": "base-1"}}
+
+
+def test_check_resume_sync_missing_mirror(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    r = Report()
+    check_resume_sync(r, _profile_with_base())
+    assert any(i.level == "error" and "resume_base.md" in i.message for i in r.issues)
+
+
+def test_check_resume_sync_unconfigured(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "profile" / "resume_base.md").write_text("# Resume Base\n")
+    r = Report()
+    check_resume_sync(r, {})
+    assert not r.has_errors
+    assert any(i.level == "warning" and "cannot verify" in i.message for i in r.issues)
+
+
+def test_check_resume_sync_in_sync_and_stale(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "profile").mkdir()
+    mirror = tmp_path / "profile" / "resume_base.md"
+    mirror.write_text("# Resume Base\nbody\n")
+    monkeypatch.setattr(resume_mirror, "render_current_mirror",
+                        lambda p: "# Resume Base\nbody\n")
+    r = Report()
+    check_resume_sync(r, _profile_with_base())
+    assert not r.has_errors
+    monkeypatch.setattr(resume_mirror, "render_current_mirror",
+                        lambda p: "# Resume Base\nchanged\n")
+    r = Report()
+    check_resume_sync(r, _profile_with_base())
+    assert r.has_errors
+
+
 def test_run_doctor_healthy(monkeypatch, tmp_path, capsys):
     _write_profile(tmp_path, "geography:\n  target_city: amsterdam\n")
     (tmp_path / "data").mkdir()
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-    # no generation files -> warnings only; no pptx -> info only
+    # no generation files -> warnings only; mirror present but no Drive base
+    # configured -> the sync check warns rather than errors
     code = run_doctor()
     assert code == 0
     out = capsys.readouterr().out
@@ -78,7 +106,7 @@ def test_run_doctor_healthy(monkeypatch, tmp_path, capsys):
 
 def test_run_doctor_errors(monkeypatch, tmp_path, capsys):
     # no profile at all + no API key -> errors
-    (tmp_path / "profile" / "resume_versions").mkdir(parents=True)
+    (tmp_path / "profile").mkdir(parents=True)
     (tmp_path / "data").mkdir()
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

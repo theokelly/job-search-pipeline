@@ -10,7 +10,7 @@ from .prompt import build_scoring_messages, SCORE_TOOL
 # forced tool_choice, so score_job asks (tool_choice="auto") and validates
 # the payload instead of assuming the schema was enforced.
 REQUIRED_SCORE_FIELDS = (
-    "tier", "skill_fit", "preference_alignment", "recommended_resume_version",
+    "tier", "skill_fit", "preference_alignment",
     "gap_assessment", "positioning_notes", "rationale",
 )
 
@@ -83,7 +83,9 @@ def _score_from_tool_input(job: Job, user_id: int, data: dict) -> Score:
         tier=data["tier"],
         skill_fit=data["skill_fit"],
         preference_alignment=data["preference_alignment"],
-        recommended_resume_version=data["recommended_resume_version"],
+        # Vestigial column: there is a single live base resume now, so the
+        # model no longer recommends between versions. Kept for old rows.
+        recommended_resume_version="base",
         gap_assessment=data["gap_assessment"],
         positioning_notes=data["positioning_notes"],
         rationale=data["rationale"],

@@ -86,7 +86,7 @@ def test_prompt_contains_narrative():
 
 def test_schema_has_required_keys():
     required = SCORING_SCHEMA["required"]
-    for key in ["tier", "skill_fit", "preference_alignment", "recommended_resume_version",
+    for key in ["tier", "skill_fit", "preference_alignment",
                 "gap_assessment", "positioning_notes", "rationale"]:
         assert key in required
 

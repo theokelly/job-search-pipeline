@@ -149,10 +149,7 @@ def run_generate(
             canonical = clustering.pick_canonical(jobs_in_cluster, profile)
             canonical_score = next(s for s in scores if pending_jobs_by_score_id[id(s)].id == canonical.id)
 
-            resume_key = f"resume_versions/{canonical_score.recommended_resume_version}.md"
-            if not profile_files.get(resume_key):
-                resume_key = "resume_versions/ai_focused.md"
-            resume_text = profile_files.get(resume_key, "")
+            resume_text = profile_files.get("resume_base.md", "")
 
             try:
                 cover_letter = generate_cover_letter(canonical, canonical_score, profile_files, profile)

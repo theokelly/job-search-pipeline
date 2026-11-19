@@ -494,10 +494,7 @@ def refresh_recs(
             if not job or not score:
                 typer.echo(f"  [{i}/{len(targets)}] SKIP {app.materials_path} (no job/score)")
                 continue
-            resume_key = f"resume_versions/{score.recommended_resume_version}.md"
-            if not profile_files.get(resume_key):
-                resume_key = "resume_versions/ai_focused.md"
-            resume_text = profile_files.get(resume_key, "")
+            resume_text = profile_files.get("resume_base.md", "")
             try:
                 rec = generate_resume_recommendation(
                     job, score, resume_text, profile, budgets_from_markdown(resume_text))

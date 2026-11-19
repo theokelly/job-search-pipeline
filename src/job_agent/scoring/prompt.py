@@ -25,11 +25,6 @@ SCORE_TOOL = {
                 "maximum": 100,
                 "description": "How well the role matches the candidate's stated preferences (0-100).",
             },
-            "recommended_resume_version": {
-                "type": "string",
-                "enum": ["ai_focused", "analytics", "strategy"],
-                "description": "Which resume version to lead with for this application.",
-            },
             "gap_assessment": {
                 "type": "string",
                 "description": "2-4 sentences on specific gaps. Be precise, no hand-waving.",
@@ -44,7 +39,7 @@ SCORE_TOOL = {
             },
         },
         "required": [
-            "tier", "skill_fit", "preference_alignment", "recommended_resume_version",
+            "tier", "skill_fit", "preference_alignment",
             "gap_assessment", "positioning_notes", "rationale",
         ],
     },

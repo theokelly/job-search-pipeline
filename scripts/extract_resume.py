@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Extract resume text from a PPTX into the markdown format used by
-profile/resume_versions/*.md.
+"""Extract resume text from a PPTX into profile/resume_base.md — the
+markdown mirror of the live base resume stored in Google Drive.
 
 Purpose-built for Theo's Dutch-style two-page CV (Google Slides export):
 a navy sidebar column plus a main column, with consistent text styles
@@ -54,10 +54,9 @@ CANONICAL_ORDER = [
 ]
 
 SOURCE_NOTE = (
-    "> Source: `{pptx_name}` (in this folder; synced {synced}). "
-    "This is the text content of the primary Dutch-style two-page A4 CV. "
-    "The PPTX remains the source of truth for rendering. "
-    "Update this file when content changes meaningfully (not styling)."
+    "> Source: live base resume in Google Drive (base modified {stamp}). "
+    "The Drive doc is the source of truth; this markdown is a generated "
+    "mirror — do not edit it by hand."
 )
 
 
@@ -134,12 +133,9 @@ def load_shapes(pptx_path: Path) -> list[Shape]:
 
 
 def _clean(text: str) -> str:
-    text = (
-        text.replace("\u2019", "'")
-        .replace("\u2018", "'")
-        .replace("\u201c", '"')
-        .replace("\u201d", '"')
-    )
+    # Verbatim apart from whitespace: the mirror feeds the tailor's fuzzy
+    # matcher against the real deck, so punctuation (curly quotes included)
+    # must survive exactly as written in the deck.
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -280,6 +276,10 @@ def extract_main(shapes: list[Shape]) -> dict:
                         pending.role = txt
                     elif size == 8:
                         pending.desc = txt
+            else:
+                # A section the classifier doesn't know (e.g. Selected
+                # Project): keep its text verbatim instead of dropping it.
+                sections.setdefault(current, []).extend(paras_of(s))
     flush()
 
     # Merge consecutive education blocks sharing institution + dates
@@ -391,6 +391,13 @@ def render_sidebar(sections: dict[str, list[Shape]]) -> dict[str, list[str]]:
         elif name == "Working Style":
             words = [_clean(s.text) for s in shapes if s.text.strip()]
             out["Working Style (Sidebar)"] = [", ".join(words)]
+        else:
+            # Unrecognized sidebar section: keep its text rather than
+            # dropping it silently.
+            lines = []
+            for s in sorted(shapes, key=lambda s: (s.slide, s.y, s.x)):
+                lines.extend(_clean(pp.text) for pp in s.paras if pp.text.strip())
+            out[f"{name} (Sidebar)"] = [f"- {ln}" for ln in lines if ln]
     return out
 
 
@@ -398,10 +405,12 @@ def render_sidebar(sections: dict[str, list[Shape]]) -> dict[str, list[str]]:
 # Rendering
 # ---------------------------------------------------------------------------
 
-def render(pptx_path: Path, title: str, main: dict, sidebar: dict[str, list[str]]) -> str:
-    synced = datetime.fromtimestamp(pptx_path.stat().st_mtime).strftime("%Y-%m-%d")
+def render(pptx_path: Path, title: str, main: dict, sidebar: dict[str, list[str]],
+           stamp: str | None = None) -> str:
+    if stamp is None:
+        stamp = datetime.fromtimestamp(pptx_path.stat().st_mtime).strftime("%Y-%m-%d")
     L: list[str] = [f"# {title}", ""]
-    L.append(SOURCE_NOTE.format(pptx_name=pptx_path.name, synced=synced))
+    L.append(SOURCE_NOTE.format(stamp=stamp))
     L.append("")
 
     name, role_title = main.get("_header", ("", ""))
@@ -411,7 +420,13 @@ def render(pptx_path: Path, title: str, main: dict, sidebar: dict[str, list[str]
     L.append(f"**{role_title}**")
     L.append("")
 
-    for sec in CANONICAL_ORDER[1:]:
+    # Canonical sections first, then any section the classifier found that
+    # isn't in the canonical list (catch-all content must not be dropped).
+    order = list(CANONICAL_ORDER[1:])
+    for sec in list(main) + list(sidebar):
+        if sec not in order and sec != "_header":
+            order.append(sec)
+    for sec in order:
         if sec in sidebar:
             L.append(f"## {sec}")
             L.append("")
@@ -475,7 +490,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Extract resume PPTX to markdown.")
     ap.add_argument("pptx", type=Path)
     ap.add_argument("output", type=Path)
-    ap.add_argument("--title", default="Resume: AI-Focused (Primary Version)")
+    ap.add_argument("--title", default="Resume Base")
     ap.add_argument("--check", action="store_true",
                     help="diff against output instead of writing")
     args = ap.parse_args()

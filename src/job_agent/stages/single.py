@@ -58,10 +58,7 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
             select(Score).where(Score.job_id == job_id, Score.user_id == user_id)
             .order_by(Score.scored_at.desc())
         ).first()
-        resume_key = f"resume_versions/{s.recommended_resume_version}.md"
-        if not profile_files.get(resume_key):
-            resume_key = "resume_versions/ai_focused.md"
-        resume_text = profile_files.get(resume_key, "")
+        resume_text = profile_files.get("resume_base.md", "")
         cover_letter = generate_cover_letter(job, s, profile_files, profile)
         resume_rec = generate_resume_recommendation(
             job, s, resume_text, profile, budgets_from_markdown(resume_text))

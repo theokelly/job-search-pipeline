@@ -444,27 +444,6 @@ def upload_tailored_pptx(profile: dict, local_path: Path, output_dir: Path) -> d
 # Driver
 # ---------------------------------------------------------------------------
 
-def resolve_pptx(version: str | None, profile: dict) -> Path:
-    """Map a resume version to its source PPTX.
-
-    Prefers the static Drive base (tailoring.base_pptx_drive_id) when set —
-    download it with download_base_pptx first. Falls back to the local
-    tailoring.pptx_map, then to the single PPTX in profile/resume_versions/.
-    """
-    pptx_map = _tailoring_cfg(profile).get("pptx_map") or {}
-    if version and version in pptx_map:
-        p = Path(pptx_map[version])
-        if p.exists():
-            return p
-    candidates = sorted(Path("profile/resume_versions").glob("*.pptx"))
-    if len(candidates) == 1:
-        return candidates[0]
-    raise FileNotFoundError(
-        f"No PPTX mapped for resume version '{version}'. "
-        "Add tailoring.pptx_map to theo.yaml."
-    )
-
-
 def tailor_from_output_dir(output_dir: Path | str, profile: dict,
                            dry_run: bool = False,
                            upload: bool | None = None) -> dict:
@@ -480,21 +459,19 @@ def tailor_from_output_dir(output_dir: Path | str, profile: dict,
     rec_path = output_dir / "resume_recommendation.md"
     if not rec_path.exists():
         raise FileNotFoundError(f"No resume_recommendation.md in {output_dir}")
-    version, edits = parse_recommendation(rec_path.read_text())
+    _version, edits = parse_recommendation(rec_path.read_text())
 
     cfg = _tailoring_cfg(profile)
-    tmp_base = None
-    if cfg.get("base_pptx_drive_id"):
-        tmp_base = Path(tempfile.mkdtemp(prefix="tailor_base_")) / "base.pptx"
-        pptx_path = download_base_pptx(profile, tmp_base)
-        source_desc = f"Drive base ({cfg['base_pptx_drive_id']})"
-    else:
-        pptx_path = resolve_pptx(version, profile)
-        source_desc = str(pptx_path)
+    if not cfg.get("base_pptx_drive_id"):
+        raise ValueError(
+            "tailoring.base_pptx_drive_id is not set — the live Drive base "
+            "is the only resume source.")
+    tmp_base = Path(tempfile.mkdtemp(prefix="tailor_base_")) / "base.pptx"
+    pptx_path = download_base_pptx(profile, tmp_base)
+    source_desc = f"Drive base ({cfg['base_pptx_drive_id']})"
 
     out_path = output_dir / "resume_tailored.pptx"
     report = apply_edits(pptx_path, edits, out_path, dry_run=dry_run)
-    report["version"] = version
     report["source_pptx"] = source_desc
     report["edits_found"] = len(edits)
 
@@ -517,7 +494,7 @@ def format_report(report: dict) -> str:
     """Human-readable summary of a tailor run."""
     lines = [
         f"Tailored resume: {report['output_path']}{' (dry run — not written)' if report['dry_run'] else ''}",
-        f"Source: {report['source_pptx']}  (version: {report.get('version')}, {report['edits_found']} edits found)",
+        f"Source: {report['source_pptx']}  ({report['edits_found']} edits found)",
         "",
     ]
     if report.get("drive_upload"):

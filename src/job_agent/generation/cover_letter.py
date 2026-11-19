@@ -22,12 +22,8 @@ def build_cover_letter_messages(job: Job, score: Score, profile_files: dict, pro
     starls = profile_files.get("accomplishments/starls.md", "")
     meta_quotes = profile_files.get("accomplishments/meta_performance.md", "")
     elevator_pitch = profile_files.get("voice/elevator_pitch.md", "")
-    # Fall back to ai_focused if the recommended version isn't extracted yet —
-    # a cover letter must never be generated without any resume content.
-    resume_text = (
-        profile_files.get(f"resume_versions/{score.recommended_resume_version}.md")
-        or profile_files.get("resume_versions/ai_focused.md", "")
-    )
+    # The single resume mirror of the live Drive base.
+    resume_text = profile_files.get("resume_base.md", "")
 
     system_text = f"""You are writing a cover letter for a job application. Follow the principles exactly and match the voice of the examples.
 
@@ -49,7 +45,7 @@ def build_cover_letter_messages(job: Job, score: Score, profile_files: dict, pro
 ## Third-party validation quotes (use at most one, only if it fits naturally)
 {meta_quotes[:meta_chars]}
 
-## Resume — {score.recommended_resume_version} version
+## Resume
 {resume_text[:resume_chars]}"""
 
     from datetime import datetime, timezone

@@ -33,8 +33,9 @@ def load_text(file_path: str) -> str:
 # Canonical list of profile files needed by the cover-letter + resume-rec prompts.
 # Single source of truth: both CLI generation flow and Streamlit "generate now"
 # button load via load_profile_files() to stay in sync.
-# Resume versions are globbed from profile/resume_versions/ at load time so a
-# newly added version (analytics.md, strategy.md) is picked up automatically.
+# The resume mirror (profile/resume_base.md) is loaded separately in
+# load_profile_files() — it is generated from the live Drive base, not a
+# hand-maintained profile file.
 GENERATION_PROFILE_FILES: tuple[str, ...] = (
     "profile/guidelines/cover_letter_principles.md",
     "profile/voice/cover_letter_examples.md",
@@ -79,18 +80,33 @@ def _maybe_sync_profile(profile: dict) -> None:
         print(f"[profile] synced from Drive: {', '.join(updated)}", file=sys.stderr)
 
 
+def _maybe_refresh_mirror(profile: dict) -> None:
+    """Refresh profile/resume_base.md from the Drive base when it changed.
+    Never breaks the caller: any failure warns and the on-disk mirror is used."""
+    try:
+        from .resume_mirror import refresh_mirror_if_stale
+        status = refresh_mirror_if_stale(profile)
+    except Exception as e:
+        print(f"[profile] resume mirror refresh failed ({e}); using local mirror",
+              file=sys.stderr)
+        return
+    if status == "updated":
+        print("[profile] resume mirror refreshed from the Drive base", file=sys.stderr)
+
+
 def load_profile_files(rel_paths: tuple[str, ...] | list[str] = GENERATION_PROFILE_FILES,
                        profile: dict | None = None) -> dict[str, str]:
     """Load profile files into a dict keyed by their path under profile/.
 
-    Missing files map to empty strings so generation can degrade gracefully if a
-    resume version or accomplishments file is not yet populated.
+    Missing files map to empty strings so generation can degrade gracefully if
+    the resume mirror or an accomplishments file is not yet populated.
 
     When profile is given and profile_sync.sync_on_load is true, Drive files
     are synced first (failures warn, never raise).
     """
     if profile is not None:
         _maybe_sync_profile(profile)
+        _maybe_refresh_mirror(profile)
     out: dict[str, str] = {}
     for rel_path in rel_paths:
         key = rel_path.replace("profile/", "")
@@ -98,11 +114,10 @@ def load_profile_files(rel_paths: tuple[str, ...] | list[str] = GENERATION_PROFI
             out[key] = load_text(rel_path)
         except FileNotFoundError:
             out[key] = ""
-    # All resume versions (README excluded — it's usage docs, not resume content)
-    for path in sorted(Path("profile/resume_versions").glob("*.md")):
-        if path.stem == "README":
-            continue
-        out[f"resume_versions/{path.name}"] = path.read_text()
+    # The resume mirror of the live Drive base (refreshed above when stale)
+    mirror = Path("profile/resume_base.md")
+    if mirror.exists():
+        out["resume_base.md"] = mirror.read_text()
     return out
 
 
@@ -280,7 +295,6 @@ _PROFILE_SPEC: dict[str, object] = {
         }],
     },
     "tailoring": {
-        "pptx_map": dict,
         "base_pptx_drive_id": str,
         "output_parent_folder_id": str,
         "upload_to_drive": bool,

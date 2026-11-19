@@ -44,10 +44,7 @@ def main() -> None:
                 skipped += 1
                 continue
 
-            resume_key = f"resume_versions/{sc.recommended_resume_version}.md"
-            if not profile_files.get(resume_key):
-                resume_key = "resume_versions/ai_focused.md"
-            resume_text = profile_files.get(resume_key, "")
+            resume_text = profile_files.get("resume_base.md", "")
 
             try:
                 md = generate_resume_recommendation(job, sc, resume_text, profile)

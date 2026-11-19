@@ -61,7 +61,6 @@ def _job_card(job: Job, score: Score, generated_at: str) -> str:
 | Tier | {score.tier} |
 | Skill fit | {score.skill_fit}/100 |
 | Preference alignment | {score.preference_alignment}/100 |
-| Resume version | {score.recommended_resume_version} |
 
 ## Score summary
 {score.rationale}
@@ -100,7 +99,6 @@ def write_outputs(
         "tier": score.tier,
         "skill_fit": score.skill_fit,
         "preference_alignment": score.preference_alignment,
-        "recommended_resume_version": score.recommended_resume_version,
         "gap_assessment": score.gap_assessment,
         "positioning_notes": score.positioning_notes,
         "rationale": score.rationale,

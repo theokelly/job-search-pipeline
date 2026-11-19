@@ -11,7 +11,7 @@ RESUME_TOOL = {
         "properties": {
             "version_rationale": {
                 "type": "string",
-                "description": "One sentence: which resume version and why.",
+                "description": "One sentence: the tailoring strategy for this role and why.",
             },
             "edits": {
                 "type": "array",
@@ -72,7 +72,7 @@ def build_resume_rec_messages(job: Job, score: Score, resume_text: str, profile:
                     "text": f"""You are advising on how to tailor a resume for a specific job application.
 Provide surgical, specific recommendations — not generic advice.
 
-## Resume ({score.recommended_resume_version} version)
+## Resume
 {resume_text[:resume_chars]}""",
                     "cache_control": {"type": "ephemeral"},
                 },
@@ -126,8 +126,7 @@ def _bullet_lines(label: str, value: str) -> list[str]:
 
 def format_resume_rec(score: Score, data: dict) -> str:
     """Render the tool-use payload as the markdown that gets written to disk."""
-    lines = [f"**Resume version:** {score.recommended_resume_version}",
-             f"**Why:** {data['version_rationale']}", ""]
+    lines = [f"**Why:** {data['version_rationale']}", ""]
     for edit in data.get("edits", []):
         op = edit.get("operation", "replace")
         lines.append(f"**{edit['section']}**")
