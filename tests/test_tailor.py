@@ -241,9 +241,12 @@ def test_upload_tailored_pptx(monkeypatch, tmp_path):
     result = tailor_mod.upload_tailored_pptx(profile, pptx, out_dir)
     assert result["folder_id"] == "folder-123"
     assert result["filename"].startswith("TheoKelly_CV_acme-corp_")
-    assert result["filename"].endswith(".pptx")
+    assert not result["filename"].endswith(".pptx")
     body = drive.files().created[0]
     assert body["parents"] == ["folder-123"]
+    # The create body carries the Slides MIME type: Drive converts the
+    # uploaded PPTX so the copy lands as a native Google Slides doc.
+    assert body["mimeType"] == "application/vnd.google-apps.presentation"
 
 
 def test_tailor_from_output_dir_drive_base(monkeypatch, tmp_path):
@@ -276,4 +279,4 @@ def test_tailor_from_output_dir_drive_base(monkeypatch, tmp_path):
     assert "Drive base (base-1)" in report["source_pptx"]
     assert len(report["applied"]) == 1
     assert (out_dir / "resume_tailored.pptx").exists()
-    assert report["drive_upload"]["filename"].endswith(".pptx")
+    assert not report["drive_upload"]["filename"].endswith(".pptx")

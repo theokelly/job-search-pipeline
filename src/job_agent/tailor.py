@@ -393,10 +393,14 @@ def _slug(text: str) -> str:
 
 
 def upload_tailored_pptx(profile: dict, local_path: Path, output_dir: Path) -> dict:
-    """Upload the tailored PPTX to the current YYYY_MM folder in Drive.
+    """Upload the tailored resume to the current YYYY_MM folder in Drive.
 
-    Returns {file_id, web_link, folder_id}. Company/date for the filename
-    come from score.json in the output dir when available.
+    The edited PPTX is converted to a native Google Slides doc on upload
+    (the create body carries the Slides MIME type), so tailored copies
+    always land as Slides regardless of the base format.
+
+    Returns {file_id, web_link, folder_id, filename}. Company/date for the
+    filename come from score.json in the output dir when available.
     """
     from .drive_sync import get_google_services
     from googleapiclient.http import MediaFileUpload
@@ -420,12 +424,13 @@ def upload_tailored_pptx(profile: dict, local_path: Path, output_dir: Path) -> d
     drive, _ = get_google_services(profile)
     month = datetime.now().strftime("%Y_%m")
     folder_id = _find_or_create_folder(drive, month, parent_id)
-    filename = f"TheoKelly_CV_{company}_{datestr}.pptx"
+    filename = f"TheoKelly_CV_{company}_{datestr}"
     media = MediaFileUpload(str(local_path),
                             mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                             resumable=True)
     created = drive.files().create(
-        body={"name": filename, "parents": [folder_id]},
+        body={"name": filename, "parents": [folder_id],
+              "mimeType": "application/vnd.google-apps.presentation"},
         media_body=media,
         fields="id, webViewLink",
     ).execute()
