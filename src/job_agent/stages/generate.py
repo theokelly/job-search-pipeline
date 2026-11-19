@@ -153,9 +153,13 @@ def run_generate(
 
             try:
                 cover_letter = generate_cover_letter(canonical, canonical_score, profile_files, profile)
+                dropped_recs: list = []
                 resume_rec = generate_resume_recommendation(
                     canonical, canonical_score, resume_text, profile,
-                    budgets_from_markdown(resume_text))
+                    budgets_from_markdown(resume_text),
+                    profile_files=profile_files, dropped=dropped_recs)
+                for d in dropped_recs:
+                    echo(f"  [grounding] dropped resume edit — {d}")
                 # Cheap Haiku assists: pre-drafted form answers + grounding
                 # check on the letter. Neither blocks the pipeline on failure.
                 try:
@@ -166,6 +170,11 @@ def run_generate(
                 grounding = check_grounding(
                     canonical, canonical_score, cover_letter, resume_text,
                     profile_files.get("accomplishments/starls.md", ""), profile)
+                rec_grounding = check_grounding(
+                    canonical, canonical_score, resume_rec, resume_text,
+                    profile_files.get("accomplishments/starls.md", ""), profile,
+                    document_label="Resume recommendation")
+                grounding = grounding + "\n\n---\n\n" + rec_grounding
                 out_dir = write_outputs(canonical, canonical_score, cover_letter, resume_rec,
                                         application_answers=answers, grounding_check=grounding,
                                         user_slug=user_slug)

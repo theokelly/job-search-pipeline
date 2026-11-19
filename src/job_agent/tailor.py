@@ -440,6 +440,42 @@ def upload_tailored_pptx(profile: dict, local_path: Path, output_dir: Path) -> d
             "filename": filename}
 
 
+def _grounding_filter(edits: list[dict], profile: dict) -> tuple[list[dict], list[dict]]:
+    """Backstop: block replace edits whose numbers aren't grounded in the
+    profile source materials (protects recommendation files written before
+    the generation gate existed, or edited by hand).
+
+    Returns (kept_edits, skip_entries). Fail-open: any problem loading the
+    corpus returns the edits untouched — the tailor must never break on this.
+    """
+    try:
+        from .config import load_profile_files
+        from .generation.claim_check import build_corpus, check_edit
+        files = load_profile_files(profile=profile)
+        if not files:
+            return edits, []
+        corpus = build_corpus(list(files.values()))
+        if not corpus.index:
+            return edits, []
+        kept, skips = [], []
+        for edit in edits:
+            flags = []
+            if edit.get("operation", "replace") != "reorder":
+                flags = check_edit(edit, corpus, require_quote=False)
+            if flags:
+                skips.append({
+                    "section": edit.get("section", ""),
+                    "operation": edit.get("operation", "replace"),
+                    "status": "skipped",
+                    "detail": f"grounding check: {flags[0]}",
+                })
+            else:
+                kept.append(edit)
+        return kept, skips
+    except Exception:
+        return edits, []
+
+
 # ---------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------
@@ -460,6 +496,8 @@ def tailor_from_output_dir(output_dir: Path | str, profile: dict,
     if not rec_path.exists():
         raise FileNotFoundError(f"No resume_recommendation.md in {output_dir}")
     _version, edits = parse_recommendation(rec_path.read_text())
+    edits_found = len(edits)
+    edits, grounding_skips = _grounding_filter(edits, profile)
 
     cfg = _tailoring_cfg(profile)
     if not cfg.get("base_pptx_drive_id"):
@@ -472,8 +510,10 @@ def tailor_from_output_dir(output_dir: Path | str, profile: dict,
 
     out_path = output_dir / "resume_tailored.pptx"
     report = apply_edits(pptx_path, edits, out_path, dry_run=dry_run)
+    if grounding_skips:
+        report["skipped"] = grounding_skips + report["skipped"]
     report["source_pptx"] = source_desc
-    report["edits_found"] = len(edits)
+    report["edits_found"] = edits_found
 
     if tmp_base and tmp_base.exists():
         tmp_base.unlink()

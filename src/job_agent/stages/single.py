@@ -61,7 +61,8 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
         resume_text = profile_files.get("resume_base.md", "")
         cover_letter = generate_cover_letter(job, s, profile_files, profile)
         resume_rec = generate_resume_recommendation(
-            job, s, resume_text, profile, budgets_from_markdown(resume_text))
+            job, s, resume_text, profile, budgets_from_markdown(resume_text),
+            profile_files=profile_files)
         try:
             answers = generate_application_answers(job, profile, resume_text)
         except Exception:
@@ -69,6 +70,11 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
         grounding = check_grounding(
             job, s, cover_letter, resume_text,
             profile_files.get("accomplishments/starls.md", ""), profile)
+        rec_grounding = check_grounding(
+            job, s, resume_rec, resume_text,
+            profile_files.get("accomplishments/starls.md", ""), profile,
+            document_label="Resume recommendation")
+        grounding = grounding + "\n\n---\n\n" + rec_grounding
         out_dir = write_outputs(job, s, cover_letter, resume_rec,
                                 application_answers=answers, grounding_check=grounding,
                                 user_slug=user_slug)

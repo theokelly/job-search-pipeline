@@ -47,7 +47,8 @@ def main() -> None:
             resume_text = profile_files.get("resume_base.md", "")
 
             try:
-                md = generate_resume_recommendation(job, sc, resume_text, profile)
+                md = generate_resume_recommendation(job, sc, resume_text, profile,
+                                                    profile_files=profile_files)
                 (target_dir / "resume_recommendation.md").write_text(md)
                 fixed += 1
                 print(f"  [{i}/{total}] OK {job.company} — {job.title}", flush=True)

@@ -25,7 +25,7 @@ def _score() -> Score:
 def test_prompt_contains_letter_and_ground_truth():
     messages = build_grounding_check_messages(
         _job(), _score(),
-        cover_letter="I led a team of 12 at Initech.",
+        document="I led a team of 12 at Initech.",
         resume_text="Senior Analyst at Initech, team of 5.",
         starls_text="Grew pipeline reliability.",
         profile={},
@@ -49,3 +49,15 @@ def test_check_never_raises(monkeypatch):
     report = check_grounding(_job(), _score(), "letter", "resume", "starls", {})
     assert "**Verdict:** REVIEW" in report
     assert "no network" in report
+
+
+def test_document_label_in_prompt():
+    messages = build_grounding_check_messages(
+        _job(), _score(),
+        document="**Why:** strategy",
+        resume_text="resume", starls_text="starls", profile={},
+        document_label="Resume recommendation",
+    )
+    text = messages[0]["content"]
+    assert "## Resume recommendation to verify" in text
+    assert "in the resume recommendation" in text

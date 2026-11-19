@@ -27,6 +27,7 @@ RESUME_TOOL = {
                         "section": {"type": "string", "description": "Which section or bullet to edit."},
                         "original": {"type": "string", "description": "The existing text to change (replace) or the bullet to move (reorder)."},
                         "suggested": {"type": "string", "description": "The replacement text (replace) or the bullet it should follow (reorder)."},
+                        "source_quote": {"type": "string", "description": "For a replace whose original is '<UNKNOWN>' (a brand-new bullet): the verbatim span from the resume or source material the new text draws from. Leave empty for edits anchored to existing text."},
                         "reason": {"type": "string", "description": "Why this edit helps for this role."},
                     },
                     "required": ["section", "original", "suggested", "reason"],
@@ -41,7 +42,8 @@ RESUME_TOOL = {
 
 
 def build_resume_rec_messages(job: Job, score: Score, resume_text: str, profile: dict,
-                               budgets: list[dict] | None = None) -> list[dict]:
+                               budgets: list[dict] | None = None,
+                               starls_text: str = "", brag_text: str = "") -> list[dict]:
     """Render the resume-recommendation messages. Shared by sync + batch paths.
 
     budgets: optional [{locator, original, budget}] from extract_resume.
@@ -50,6 +52,14 @@ def build_resume_rec_messages(job: Job, score: Score, resume_text: str, profile:
     """
     resume_chars = settings.truncation(profile, "resume_rec_resume_chars")
     jd_chars = settings.truncation(profile, "resume_rec_jd_chars")
+    source_block = ""
+    if starls_text or brag_text:
+        parts = ["\n\n## Source material — accomplishments bank (ground truth for stories and numbers)"]
+        if starls_text:
+            parts.append(starls_text[:4000])
+        if brag_text:
+            parts.append(brag_text[:2000])
+        source_block = "\n\n".join(parts)
     layout_block = ""
     if budgets:
         lines = [
@@ -72,8 +82,13 @@ def build_resume_rec_messages(job: Job, score: Score, resume_text: str, profile:
                     "text": f"""You are advising on how to tailor a resume for a specific job application.
 Provide surgical, specific recommendations — not generic advice.
 
+Grounding rules (hard constraints):
+- Preserve every number and its unit exactly as the sources state them. Never introduce a number, percentage, or count that does not appear in the resume or the source material below.
+- Do not import the job description's scale language into the candidate's experience: terms like "at scale", adoption rates, or "agents" describe the role unless the sources use them for the candidate's own work.
+- For a brand-new bullet (original "<UNKNOWN>"), set source_quote to the verbatim source span the bullet draws from.
+
 ## Resume
-{resume_text[:resume_chars]}""",
+{resume_text[:resume_chars]}{source_block}""",
                     "cache_control": {"type": "ephemeral"},
                 },
                 {
@@ -143,18 +158,71 @@ def format_resume_rec(score: Score, data: dict) -> str:
 
 
 def generate_resume_recommendation(job: Job, score: Score, resume_text: str, profile: dict,
-                                   budgets: list[dict] | None = None) -> str:
+                                   budgets: list[dict] | None = None,
+                                   profile_files: dict | None = None,
+                                   dropped: list | None = None) -> str:
+    """Generate the recommendation, gated by the deterministic claim check.
+
+    Every edit's numbers are validated against the source corpus (all profile
+    files when provided, else the resume alone). A violating payload gets ONE
+    corrective retry naming the offending claims; edits that still violate
+    are dropped — their descriptions are appended to `dropped` when a list is
+    passed — rather than written to disk.
+    """
+    from .claim_check import build_corpus, check_edit
+
+    starls_text = brag_text = ""
+    if profile_files:
+        starls_text = profile_files.get("accomplishments/starls.md", "")
+        brag_text = profile_files.get("accomplishments/brag_sheet.md", "")
+    corpus = build_corpus(
+        list(profile_files.values()) if profile_files else [resume_text])
+
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     model = settings.model_for(profile, "resume_recommendation")
-    messages = build_resume_rec_messages(job, score, resume_text, profile, budgets)
+    messages = build_resume_rec_messages(job, score, resume_text, profile, budgets,
+                                         starls_text=starls_text,
+                                         brag_text=brag_text)
 
-    response = client.messages.create(
-        model=model,
-        max_tokens=1024,
-        tools=[RESUME_TOOL],
-        tool_choice={"type": "tool", "name": "record_resume_recommendation"},
-        messages=messages,
-    )
+    data: dict = {}
+    for attempt in range(2):
+        response = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            tools=[RESUME_TOOL],
+            tool_choice={"type": "tool", "name": "record_resume_recommendation"},
+            messages=messages,
+        )
+        tool_use = next(b for b in response.content if b.type == "tool_use")
+        data = tool_use.input
+        violations = {}
+        for i, edit in enumerate(data.get("edits", [])):
+            flags = check_edit(edit, corpus, require_quote=True)
+            if flags:
+                violations[i] = flags
+        if not violations:
+            break
+        if attempt == 0:
+            detail = "; ".join(
+                f"edit {i + 1} ({data['edits'][i].get('section', '')}): "
+                f"{', '.join(flags)}"
+                for i, flags in violations.items())
+            messages = messages + [
+                {"role": "assistant", "content": [tool_use]},
+                {"role": "user", "content":
+                    "Some edits failed grounding validation against the source "
+                    f"materials: {detail}. Rewrite the full recommendation: fix "
+                    "or drop those edits, keep the valid edits unchanged, and "
+                    "use only numbers and units that appear verbatim in the "
+                    "resume or source material."},
+            ]
 
-    tool_use = next(b for b in response.content if b.type == "tool_use")
-    return format_resume_rec(score, tool_use.input)
+    kept = []
+    for edit in data.get("edits", []):
+        flags = check_edit(edit, corpus, require_quote=True)
+        if flags:
+            if dropped is not None:
+                dropped.append(f"{edit.get('section', '')}: {flags[0]}")
+        else:
+            kept.append(edit)
+    return format_resume_rec(score, {**data, "edits": kept})

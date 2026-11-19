@@ -497,7 +497,8 @@ def refresh_recs(
             resume_text = profile_files.get("resume_base.md", "")
             try:
                 rec = generate_resume_recommendation(
-                    job, score, resume_text, profile, budgets_from_markdown(resume_text))
+                    job, score, resume_text, profile, budgets_from_markdown(resume_text),
+                    profile_files=profile_files)
                 (Path(app.materials_path) / "resume_recommendation.md").write_text(rec)
                 typer.echo(f"  [{i}/{len(targets)}] refreshed {Path(app.materials_path).name}")
             except Exception as e:
