@@ -15,7 +15,7 @@ Usage:
 """
 import argparse
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlmodel import select
@@ -48,7 +48,7 @@ def main(apply: bool) -> None:
     # Backup DB before any mutation
     if apply:
         db_path = Path("data/jobs.sqlite")
-        stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         backup = db_path.with_name(f"jobs.sqlite.bak-pre-dedupe-{stamp}")
         shutil.copy2(db_path, backup)
         print(f"DB backup → {backup}")

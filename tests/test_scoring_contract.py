@@ -1,7 +1,7 @@
 """
 Verifies the scoring prompt structure and schema — no live API calls.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from job_agent.db import Job, job_id
 from job_agent.scoring.prompt import build_scoring_messages, SCORING_SCHEMA, SCORE_TOOL
 
@@ -15,8 +15,8 @@ def make_job() -> Job:
         location="Amsterdam",
         url="https://example.com/job",
         description_raw="We are looking for an ML Engineer with 3+ years Python experience.",
-        first_seen=datetime.utcnow(),
-        last_seen=datetime.utcnow(),
+        first_seen=datetime.now(timezone.utc).replace(tzinfo=None),
+        last_seen=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
 

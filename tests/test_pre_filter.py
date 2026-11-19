@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from job_agent.db import Job, job_id
 from job_agent.filter import pre_filter
 
@@ -12,8 +12,8 @@ def make_job(title="Data Analyst", location="Amsterdam", description="") -> Job:
         location=location,
         url="https://example.com",
         description_raw=description,
-        first_seen=datetime.utcnow(),
-        last_seen=datetime.utcnow(),
+        first_seen=datetime.now(timezone.utc).replace(tzinfo=None),
+        last_seen=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
 

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from job_agent.db import Job, job_id
 from job_agent.clustering import geo_priority, pick_canonical
 
@@ -14,7 +14,7 @@ def _job(location, desc="x" * 100):
     return Job(
         id=job_id("Acme", "Head of AI", location), source="linkedin", company="Acme",
         title="Head of AI", location=location, url="https://example.com",
-        description_raw=desc, first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+        description_raw=desc, first_seen=datetime.now(timezone.utc).replace(tzinfo=None), last_seen=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
 

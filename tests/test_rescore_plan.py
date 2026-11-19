@@ -1,5 +1,5 @@
 """_plan_scoring must not copy an existing score back when rescoring."""
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import SQLModel, Session, create_engine
 from job_agent.db import Job, Score, job_id
 from job_agent.pipeline import _plan_scoring
@@ -8,7 +8,7 @@ from job_agent.pipeline import _plan_scoring
 def _job(title, loc):
     return Job(id=job_id("Acme", title, loc), source="x", company="Acme", title=title,
                location=loc, url="", description_raw="x" * 200,
-               first_seen=datetime.utcnow(), last_seen=datetime.utcnow())
+               first_seen=datetime.now(timezone.utc).replace(tzinfo=None), last_seen=datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 def _setup():
