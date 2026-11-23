@@ -35,7 +35,8 @@ Cases live in `golden_cases.json`, which is **gitignored**: it holds
 real JD text and company names. `scripts/build_golden_cases.py`
 regenerates it from the jobs DB; the builder references postings by id
 only. Result files under `results/` are keyed by opaque case slug and
-are safe to commit.
+are safe to commit. (Console output names the company and role for
+readability; only the file is slug-only.)
 
 ## Assertion model
 

@@ -119,7 +119,8 @@ def main() -> int:
             extra = (f" | tier {row['actual_tier']} (exp {row['expected_tier']}) "
                      f"skill {row['skill_fit']} pref {row['preference_alignment']} "
                      f"| score {'PASS' if row['score_pass'] else 'WARN'}")
-        print(f"[{mark}] {row['slug']}: prescreen {row['actual_prescreen']} "
+        print(f"[{mark}] {row['slug']} [{case['company']} — {case['title']}]: "
+              f"prescreen {row['actual_prescreen']} "
               f"(exp {row['expected_prescreen']}){extra}")
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M")
