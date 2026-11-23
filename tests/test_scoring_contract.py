@@ -97,3 +97,26 @@ def test_tier_enum_values():
     assert "Worth Reviewing" in tier_enum
     assert "Long Shot" in tier_enum
     assert "Skip" in tier_enum
+
+
+def _system_text(messages):
+    return messages[0]["content"][0]["text"]
+
+
+def test_prompt_includes_seniority_context_when_present():
+    profile = dict(PROFILE)
+    profile["seniority"] = {
+        "current_level": "Chief of Staff",
+        "ideal_target": "Head of AI",
+        "step_down_conditions": "Step-down acceptable if AI is core.",
+    }
+    messages = build_scoring_messages(make_job(), profile, NARRATIVE)
+    text = _system_text(messages)
+    assert "SENIORITY CONTEXT" in text
+    assert "Step-down acceptable if AI is core." in text
+    assert "Chief of Staff" in text
+
+
+def test_prompt_omits_seniority_context_when_absent():
+    messages = build_scoring_messages(make_job(), PROFILE, NARRATIVE)
+    assert "SENIORITY CONTEXT" not in _system_text(messages)

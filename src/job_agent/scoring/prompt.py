@@ -67,6 +67,17 @@ def _format_tier_defs(tier_defs: dict) -> str:
     return "\n".join(f"  {tier}: {desc}" for tier, desc in tier_defs.items())
 
 
+def _format_seniority(seniority: dict) -> str:
+    lines = []
+    if seniority.get("current_level"):
+        lines.append(f"Current level: {seniority['current_level']}")
+    if seniority.get("ideal_target"):
+        lines.append(f"Ideal target: {seniority['ideal_target']}")
+    if seniority.get("step_down_conditions"):
+        lines.append(f"Step-down position: {seniority['step_down_conditions']}")
+    return "\n".join(lines)
+
+
 def build_scoring_messages(job: Job, profile: dict, narrative_guidance: str) -> list[dict]:
     """
     Returns an Anthropic messages list with cache_control on the expensive static blocks.
@@ -78,6 +89,9 @@ def build_scoring_messages(job: Job, profile: dict, narrative_guidance: str) -> 
     tier_defs = scoring_cfg.get("tier_definitions", {})
     honesty_notes = scoring_cfg.get("honesty_calibration", [])
     not_targeting = profile.get("not_targeting", [])
+    seniority = profile.get("seniority", {})
+    seniority_section = (f"\n\nSENIORITY CONTEXT:\n{_format_seniority(seniority)}"
+                         if seniority else "")
 
     system_block = f"""You are evaluating job postings against a candidate profile to assign a fit tier.
 You will call the record_score tool with your assessment.
@@ -95,7 +109,7 @@ SKILL FIT SIGNALS:
 {_format_signals(skill_signals)}
 
 PREFERENCE ALIGNMENT SIGNALS:
-{_format_signals(pref_signals)}"""
+{_format_signals(pref_signals)}{seniority_section}"""
 
     narrative_block = f"""## Candidate narrative and positioning strategy
 
