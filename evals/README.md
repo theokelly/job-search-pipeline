@@ -22,8 +22,11 @@ deliberate:
 
 - Roles the prescreen once falsely rejected (expected: approve), most
   with a scoring anchor — a known-good tier and reference subscores.
-- One known open miss, kept in the set as a failing case until the
-  prescreen improves enough to pass it.
+- One bar-setting case: an internal-enablement role whose JD is all
+  enablement delivery (workshops, champions, fluency surveys) with no
+  leadership mandate — no team, no direct reports. Initially labeled
+  approve on title; relabeled reject on 2026-11-23 after a joint
+  review of the JD text. It now guards the leadership bar.
 - Clear-cut rejects as controls: a role whose JD states a hard
   language requirement, an out-of-geography hybrid, individual-
   contributor delivery roles, an internship.

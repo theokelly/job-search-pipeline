@@ -32,7 +32,7 @@ SPECS = [
     ("case_04", "13321b93", "approved", "Long Shot", 28, 62),    # Prosus Group PM, AI Platform
     ("case_05", "BUNQ",     "approved", "Skip", 22, 40),         # bunq Head of Product - gate fixed, scorer lukewarm
     ("case_06", "d18deb98", "approved", "Strong Fit", 82, 72),  # Genmab - label revised to Strong Fit by Theo 2026-11-23 (scorer + production DB agreed; Nov 6 calibration label superseded)
-    ("case_07", "f76d6269", "approved", None, None, None),       # n8n Internal AI Enablement Lead - known open miss
+    ("case_07", "f76d6269", "rejected", None, None, None),       # n8n Internal AI Enablement Lead - relabeled reject 2026-11-23: JD is enablement delivery (workshops, champions, fluency surveys) with no leadership mandate; Theo's ruling after joint JD review
     ("case_08", "7982361d", "rejected", None, None, None),       # Lorien - JD states fluent Dutch essential
     ("case_09", "458bc9cf", "rejected", None, None, None),       # TE Connectivity France hybrid - geography
     ("case_10", "242042e8", "rejected", None, None, None),       # Databricks FDE IC - pure engineering delivery
