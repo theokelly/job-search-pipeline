@@ -31,7 +31,7 @@ SPECS = [
     ("case_03", "6c16b922", "approved", "Strong Fit", 80, 92),   # Adyen AI Transformation Manager - Finance
     ("case_04", "13321b93", "approved", "Long Shot", 28, 62),    # Prosus Group PM, AI Platform
     ("case_05", "BUNQ",     "approved", "Skip", 22, 40),         # bunq Head of Product - gate fixed, scorer lukewarm
-    ("case_06", "d18deb98", "approved", "Worth Reviewing", None, None),  # Genmab - curated calibration label
+    ("case_06", "d18deb98", "approved", "Strong Fit", 82, 72),  # Genmab - label revised to Strong Fit by Theo 2026-11-23 (scorer + production DB agreed; Nov 6 calibration label superseded)
     ("case_07", "f76d6269", "approved", None, None, None),       # n8n Internal AI Enablement Lead - known open miss
     ("case_08", "7982361d", "rejected", None, None, None),       # Lorien - JD states fluent Dutch essential
     ("case_09", "458bc9cf", "rejected", None, None, None),       # TE Connectivity France hybrid - geography
