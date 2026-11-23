@@ -82,3 +82,37 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
         session.add(app)
         session.commit()
     return out_dir
+
+
+POSTING_STATUSES = ("active", "closed", "expired", "out_of_scope")
+
+
+def mark_posting_status(job_id: str, status: str) -> list[str]:
+    """Set Job.status for a job AND every sibling in its cluster.
+
+    Backs the Streamlit UI's Mark-closed / Reopen buttons. Siblings are the
+    same posting on other boards or geographies, so the lifecycle state
+    stays consistent across them (same reasoning as app_status in the UI).
+    Deliberately NOT sticky: upsert_job still revives the posting if
+    discovery re-sees it — postings sometimes reopen.
+    Returns the ids updated ([] when the job doesn't exist).
+    """
+    if status not in POSTING_STATUSES:
+        raise ValueError(f"unknown posting status: {status!r}")
+    from ..clustering import cluster_key
+    from sqlmodel import select
+
+    init_db()
+    with get_session() as session:
+        clicked = session.get(Job, job_id)
+        if not clicked:
+            return []
+        target_key = cluster_key(clicked)
+        updated = []
+        for job in session.exec(select(Job)).all():
+            if cluster_key(job) == target_key:
+                job.status = status
+                session.add(job)
+                updated.append(job.id)
+        session.commit()
+    return updated

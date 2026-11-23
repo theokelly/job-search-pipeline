@@ -25,7 +25,7 @@ from src.job_agent.db import (
     init_db, get_session, get_or_create_meta,
     Job, Score, Application, User, UserJobMeta,
 )
-from src.job_agent.pipeline import score_one, generate_one
+from src.job_agent.pipeline import score_one, generate_one, mark_posting_status
 from src.job_agent.discovery.manual import fetch_from_url
 from src.job_agent.db import job_id as compute_job_id, upsert_job
 from src.job_agent import clustering
@@ -520,6 +520,12 @@ def generate_materials_now(job_id: str, user_id: int) -> Path:
     return out_dir
 
 
+def set_posting_status_now(job_id: str, status: str):
+    """Mark the posting closed / reopen it (cascades to cluster siblings)."""
+    mark_posting_status(job_id, status)
+    st.cache_data.clear()
+
+
 def tailor_resume_now(materials_path: str) -> dict:
     """Apply the resume recommendation to a PPTX copy. Returns the tailor report."""
     from src.job_agent.tailor import tailor_from_output_dir
@@ -883,6 +889,23 @@ def render_job_detail(job_id: str):
             if st.button(label, key=f"status_{val}", width="stretch",
                          type="primary" if (current_status == val) else "secondary"):
                 set_app_status(job_id, user_id, val)
+                st.rerun()
+
+    st.markdown("---")
+
+    # Posting lifecycle (Job.status) — manual close / reopen. Not sticky:
+    # discovery revives the posting if it is re-seen (postings reopen).
+    pcol1, pcol2 = st.columns([2, 1])
+    with pcol1:
+        st.markdown(f"**Posting:** {POSTING_STATUS_LABELS.get(job.status, job.status)}")
+    with pcol2:
+        if job.status == "active":
+            if st.button("🔴 Mark posting closed", key="posting_close", width="stretch"):
+                set_posting_status_now(job_id, "closed")
+                st.rerun()
+        else:
+            if st.button("↻ Reopen (mark active)", key="posting_reopen", width="stretch"):
+                set_posting_status_now(job_id, "active")
                 st.rerun()
 
     st.markdown("---")

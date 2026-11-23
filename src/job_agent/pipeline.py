@@ -6,7 +6,7 @@ The stage implementations live in `stages/` (see PLAN.md Phase B1):
     stages/housekeeping.py  run_sweep, run_prune_closed
     stages/score.py         run_score, fetch_score_batch, fetch_prescreen_batch
     stages/generate.py      run_generate
-    stages/single.py        score_one, generate_one
+    stages/single.py        score_one, generate_one, mark_posting_status
 
 Both the CLI (`cli.py`) and the Streamlit UI import from this module, so it
 re-exports every public name to keep those import sites unchanged. Private
@@ -20,7 +20,7 @@ from .stages.score import (
     fetch_score_batch, fetch_prescreen_batch,
 )
 from .stages.generate import run_generate
-from .stages.single import score_one, generate_one
+from .stages.single import score_one, generate_one, mark_posting_status
 
 __all__ = [
     "PROFILE_PATH_DEFAULT",
@@ -34,4 +34,5 @@ __all__ = [
     "run_generate",
     "score_one",
     "generate_one",
+    "mark_posting_status",
 ]
