@@ -130,31 +130,6 @@ _COUNTRY_WORDS = {
 }
 
 
-def _clean_location(loc: str) -> str:
-    """Return a short city label: 'Amsterdam', 'London', 'Remote', 'Multiple', etc."""
-    if not loc:
-        return "—"
-    loc = loc.strip()
-    low = loc.lower()
-
-    if "remote" in low:
-        return "Remote"
-
-    # Multiple cities separated by slash or " / "
-    slash_parts = [p.strip() for p in loc.split("/") if p.strip()]
-    if len(slash_parts) > 1:
-        cities = {p.split(",")[0].split("·")[0].strip() for p in slash_parts}
-        if len(cities) > 1:
-            return "Multiple"
-
-    first = slash_parts[0] if slash_parts else loc
-    # Take text before first comma, middot, or em dash
-    city = first.split(",")[0].split("·")[0].split("–")[0].strip()
-    # Strip " Area" suffix
-    if city.lower().endswith(" area"):
-        city = city[:-5].strip()
-    # If the result is a country name, return it as-is (no city specified)
-    return city if city else "—"
 
 
 # ---------------------------------------------------------------------------
@@ -187,97 +162,7 @@ _init_state()
 # ---------------------------------------------------------------------------
 # DB helpers (cached per run to avoid N+1 queries)
 # ---------------------------------------------------------------------------
-@st.cache_data(ttl=30)
-def load_jobs_df(include_inactive: bool = False):
-    """Load all jobs with their latest score and meta into a DataFrame.
-
-    By default only ``active`` postings are loaded. When ``include_inactive`` is
-    set, ``closed`` and ``expired`` postings are loaded too — otherwise a job you
-    already applied to silently vanishes from the UI once its posting comes down.
-    """
-    init_db()
-    profile = load_profile("profile/theo.yaml")
-    with get_session() as s:
-        user = s.exec(select(User).where(User.slug == "theo")).first()
-        user_id = user.id if user else None
-
-        job_query = select(Job)
-        if not include_inactive:
-            job_query = job_query.where(Job.status == "active")
-        jobs = s.exec(job_query).all()
-
-        # Cluster derivation: mark canonical per (company, title) cluster
-        cluster_groups: dict[str, list[Job]] = {}
-        for j in jobs:
-            cluster_groups.setdefault(clustering.cluster_key(j), []).append(j)
-        canonical_id_by_cluster = {
-            k: clustering.pick_canonical(rows, profile).id
-            for k, rows in cluster_groups.items()
-        }
-
-        # Latest score per job
-        scores: dict[str, Score] = {}
-        if user_id:
-            all_scores = s.exec(
-                select(Score).where(Score.user_id == user_id).order_by(Score.scored_at.desc())
-            ).all()
-            for sc in all_scores:
-                if sc.job_id not in scores:
-                    scores[sc.job_id] = sc
-
-        # Meta per job
-        metas: dict[str, UserJobMeta] = {}
-        if user_id:
-            all_metas = s.exec(
-                select(UserJobMeta).where(UserJobMeta.user_id == user_id)
-            ).all()
-            for m in all_metas:
-                metas[m.job_id] = m
-
-        # Application (materials generated) per job
-        app_paths: set[str] = set()
-        if user_id:
-            apps = s.exec(select(Application).where(Application.user_id == user_id)).all()
-            for a in apps:
-                app_paths.add(a.job_id)
-
-        rows = []
-        for job in jobs:
-            sc = scores.get(job.id)
-            meta = metas.get(job.id)
-            prescreen_status = meta.prescreen_status if meta else None
-            tier = sc.tier if sc else None
-            if tier:
-                display_tier = tier
-            elif prescreen_status == "rejected":
-                display_tier = "Screened Out"
-            else:
-                display_tier = "Unscored"
-            ck = clustering.cluster_key(job)
-            rows.append({
-                "id": job.id,
-                "company": job.company,
-                "title": job.title,
-                "location": job.location,
-                "city": _clean_location(job.location),
-                "source": SOURCE_LABELS.get(job.source, job.source),
-                "posting_status": job.status,
-                "first_seen": job.first_seen.date() if job.first_seen else None,
-                "has_jd": len((job.description_raw or "").strip()) >= 100,
-                "tier": tier,
-                "display_tier": display_tier,
-                "skill_fit": sc.skill_fit if sc else None,
-                "pref_alignment": sc.preference_alignment if sc else None,
-                "scored": sc is not None,
-                "has_materials": job.id in app_paths,
-                "app_status": meta.app_status if meta else None,
-                "prescreen_status": prescreen_status,
-                "prescreen_reason": meta.prescreen_reason if meta else None,
-                "cluster_key": ck,
-                "is_canonical": job.id == canonical_id_by_cluster[ck],
-            })
-
-        return pd.DataFrame(rows), user_id
+load_jobs_df = st.cache_data(ttl=30)(_queries.load_jobs_df)
 
 
 load_stats_timeseries = st.cache_data(ttl=30)(_queries.load_stats_timeseries)

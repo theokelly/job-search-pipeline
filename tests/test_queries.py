@@ -21,6 +21,7 @@ def engine(tmp_path, monkeypatch):
     monkeypatch.setattr(queries, "init_db", lambda *a, **k: eng)
     monkeypatch.setattr(queries, "get_session",
                         lambda *a, **k: Session(eng, expire_on_commit=False))
+    monkeypatch.setattr(queries, "load_profile", lambda *a, **k: {})
     return eng
 
 
@@ -87,3 +88,33 @@ def test_stats_timeseries_empty_db(engine):
     out = queries.load_stats_timeseries()
     assert dict(out["funnel"])["Discovered"] == 0
     assert out["cost_counts"]["score"] == 0
+
+
+def test_load_jobs_df_tiers_clusters_and_inactive(engine):
+    uid = _seed_user(engine)
+    with Session(engine) as s:
+        # Same (company, title) cluster, two postings — one canonical.
+        s.add(_job("a1", location="Amsterdam, Netherlands"))
+        s.add(_job("a2", location="Remote - Netherlands"))
+        s.add(_job("b1", company="Beta", title="AI Lead"))
+        s.add(_job("c1", company="Core", title="Data Lead", status="closed"))
+        s.add(_score("a1", uid, STRONG_FIT, datetime(2026, 11, 4, 9, 0)))
+        s.add(UserJobMeta(job_id="b1", user_id=uid, prescreen_status="rejected",
+                          prescreen_reason="geography"))
+        s.commit()
+
+    df, user_id = queries.load_jobs_df()
+    assert user_id == uid
+    assert set(df["id"]) == {"a1", "a2", "b1"}  # closed excluded by default
+    rows = {r["id"]: r for _, r in df.iterrows()}
+    assert rows["a1"]["display_tier"] == STRONG_FIT
+    assert rows["b1"]["display_tier"] == "Screened Out"
+    assert rows["a2"]["display_tier"] == "Unscored"
+    assert rows["a1"]["city"] == "Amsterdam"
+    assert rows["a2"]["city"] == "Remote"
+    assert rows["a1"]["has_jd"] is True or rows["a1"]["has_jd"] == True  # 150-char JD
+    # Exactly one canonical per cluster.
+    assert int(df["is_canonical"].sum()) == 2
+
+    df_all, _ = queries.load_jobs_df(include_inactive=True)
+    assert "c1" in set(df_all["id"])
