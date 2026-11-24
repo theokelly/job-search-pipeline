@@ -7,6 +7,8 @@ Pure functions over a `profile: dict` — no globals — to keep things testable
 """
 from typing import Any
 
+from .tiers import STRONG_FIT, WORTH_REVIEWING
+
 
 # ---------------------------------------------------------------------------
 # Defaults (used when a key is missing from the user's profile yaml)
@@ -17,8 +19,8 @@ _DEFAULT_MODELS: dict[str, Any] = {
     "score": "claude-sonnet-5-5",
     "resume_recommendation": "claude-haiku-5-5",
     "cover_letter_by_tier": {
-        "Strong Fit": "claude-opus-5-5",
-        "Worth Reviewing": "claude-sonnet-5-5",
+        STRONG_FIT: "claude-opus-5-5",
+        WORTH_REVIEWING: "claude-sonnet-5-5",
     },
     "cover_letter_default": "claude-sonnet-5-5",
     "application_answers": "claude-haiku-5-5",
