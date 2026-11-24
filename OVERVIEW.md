@@ -28,8 +28,12 @@ last, so each stage tries to pass as few jobs as possible to the next.
  │ LinkedIn search  │          before the pool hits a
  │ Greenhouse ATS   │          more expensive stage.
  │ Lever ATS        │
+ │ Ashby ATS        │
+ │ Workday ATS      │
+ │ Fanout sweep     │
  │ Gmail job alerts │
  │ Manual entry     │
+ │ URL ingest       │
  └────────┬─────────┘
           │  raw postings
           ▼
@@ -83,8 +87,10 @@ flowchart TD
         LV[Lever ATS]
         AS[Ashby ATS]
         WD[Workday ATS]
+        FAN[Fanout sweep<br/><i>multi-ATS company sweep</i>]
         EM[Gmail job alerts]
         MAN[Manual entry]
+        ING[URL ingest<br/><i>job-agent ingest</i>]
     end
 
     LI --> F
@@ -92,8 +98,10 @@ flowchart TD
     LV --> F
     AS --> F
     WD --> F
+    FAN --> F
     EM --> F
     MAN --> F
+    ING --> F
 
     F["1 · Pre-filter<br/><i>rules · free</i>"]
     CL["2 · Cluster<br/><i>company + title key</i>"]
@@ -117,6 +125,8 @@ flowchart TD
     SC --> DB
     GEN --> DB
     UI <--> DB
+    HK["Housekeeping<br/><i>sweep · prune-closed</i>"]
+    HK -.->|mark expired / closed| DB
     UI -.->|on-demand override:<br/>score / generate now| SC
 
     classDef free fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
