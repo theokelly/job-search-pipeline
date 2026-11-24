@@ -27,6 +27,7 @@ from src.job_agent.db import (
 )
 from src.job_agent.pipeline import score_one, generate_one, mark_posting_status
 from src.job_agent.discovery.manual import fetch_from_url
+from src.job_agent.tiers import STRONG_FIT, WORTH_REVIEWING, LONG_SHOT, SKIP
 from src.job_agent.db import job_id as compute_job_id, upsert_job
 from src.job_agent import clustering
 from src.job_agent.config import load_profile
@@ -45,14 +46,14 @@ st.set_page_config(
 # Constants
 # ---------------------------------------------------------------------------
 TIER_ORDER = {
-    "Strong Fit": 0, "Worth Reviewing": 1, "Long Shot": 2, "Skip": 3,
+    STRONG_FIT: 0, WORTH_REVIEWING: 1, LONG_SHOT: 2, SKIP: 3,
     "Screened Out": 4, "Unscored": 5,
 }
 TIER_CELL_STYLE = {
-    "Strong Fit":     "background-color: #1a472a; color: #6fcf97; font-weight: 600",
-    "Worth Reviewing":"background-color: #3d3200; color: #f2c94c; font-weight: 600",
-    "Long Shot":      "background-color: #4a2010; color: #eb8c34",
-    "Skip":           "background-color: #1e1e1e; color: #666",
+    STRONG_FIT:       "background-color: #1a472a; color: #6fcf97; font-weight: 600",
+    WORTH_REVIEWING:  "background-color: #3d3200; color: #f2c94c; font-weight: 600",
+    LONG_SHOT:        "background-color: #4a2010; color: #eb8c34",
+    SKIP:             "background-color: #1e1e1e; color: #666",
     "Screened Out":   "background-color: #1a1a2e; color: #555; font-style: italic",
     "Unscored":       "",
 }
@@ -364,8 +365,8 @@ def load_stats_timeseries():
             frame["date"] = pd.to_datetime(frame["date"])
 
     # --- Funnel: distinct-job counts per stage ---
-    strong = int((scoring["tier"] == "Strong Fit").sum()) if not scoring.empty else 0
-    worth = int((scoring["tier"] == "Worth Reviewing").sum()) if not scoring.empty else 0
+    strong = int((scoring["tier"] == STRONG_FIT).sum()) if not scoring.empty else 0
+    worth = int((scoring["tier"] == WORTH_REVIEWING).sum()) if not scoring.empty else 0
     applied_now = int((journey["app_status"] == "applied").sum()) if not journey.empty else 0
     funnel = [
         ("Discovered",        len(jobs)),
@@ -378,7 +379,7 @@ def load_stats_timeseries():
     ]
 
     # --- Cost inputs: per-stage call volumes and generation split by tier ---
-    gen_strong = int((generation["tier"] == "Strong Fit").sum()) if not generation.empty else 0
+    gen_strong = int((generation["tier"] == STRONG_FIT).sum()) if not generation.empty else 0
     counts = {
         "prescreen": prescreen_total,
         "score": len(latest_score),
@@ -973,7 +974,7 @@ def render_job_detail(job_id: str):
                     st.warning(f"⚠️ {cldoc_report['length_warning']}")
                 else:
                     st.caption(f"{cldoc_report['word_count']} words (sample one-pager: {cldoc_report['sample_word_count']})")
-        elif sc and sc.tier in ("Strong Fit", "Worth Reviewing"):
+        elif sc and sc.tier in (STRONG_FIT, WORTH_REVIEWING):
             st.info("Materials not yet generated for this job.")
             if st.button("⚡ Generate materials now", key="gen_cl", type="primary"):
                 with st.spinner("Generating cover letter and resume recommendation..."):
@@ -1027,7 +1028,7 @@ def render_job_detail(job_id: str):
             report = st.session_state.get(f"tailor_report_{job_id}")
             if report:
                 render_tailor_report(report)
-        elif sc and sc.tier in ("Strong Fit", "Worth Reviewing"):
+        elif sc and sc.tier in (STRONG_FIT, WORTH_REVIEWING):
             st.info("Materials not yet generated.")
             if st.button("⚡ Generate materials now", key="gen_rr", type="primary"):
                 with st.spinner("Generating..."):
@@ -1185,8 +1186,8 @@ def render_add_job(user_id: int | None):
 # ---------------------------------------------------------------------------
 # Chart palettes (aligned with the tier/status colours used elsewhere in the UI)
 TIER_CHART_COLORS = {
-    "Strong Fit": "#2e7d32", "Worth Reviewing": "#f2c94c",
-    "Long Shot": "#eb8c34", "Skip": "#777777",
+    STRONG_FIT: "#2e7d32", WORTH_REVIEWING: "#f2c94c",
+    LONG_SHOT: "#eb8c34", SKIP: "#777777",
 }
 STATUS_CHART_COLORS = {
     "applied": "#4c78a8", "interviewing": "#9467bd", "offer": "#2ca02c",
@@ -1392,7 +1393,7 @@ def _render_api_usage(ts):
     if not gen.empty:
         gcost = gen["tier"].map(
             lambda t: _stage_call_cost("resume_rec") + _stage_call_cost(
-                "cover_letter_strong" if t == "Strong Fit" else "cover_letter_other")
+                "cover_letter_strong" if t == STRONG_FIT else "cover_letter_other")
         )
         spend_frames.append(gen.assign(group="Generate", cost=gcost)[["date", "group", "cost"]])
 
@@ -1446,8 +1447,8 @@ def render_stats(df: pd.DataFrame):
     col1.metric("Total Jobs", len(df))
     scored = df[df["scored"]]
     col2.metric("Scored", len(scored))
-    strong = df[df["tier"] == "Strong Fit"]
-    col3.metric("Strong Fit", len(strong))
+    strong = df[df["tier"] == STRONG_FIT]
+    col3.metric(STRONG_FIT, len(strong))
     applied = df[df["app_status"].isin(["applied", "interviewing", "offer"])]
     col4.metric("In Progress", len(applied))
     today = datetime.now(timezone.utc).replace(tzinfo=None).date()
