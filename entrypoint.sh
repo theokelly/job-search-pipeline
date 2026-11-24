@@ -2,16 +2,11 @@
 set -e
 cd /workspace
 
-# Create venv if not present
-if [ ! -d ".venv" ]; then
-    echo "[setup] Creating virtual environment..."
-    python3 -m venv .venv
-fi
-
-# Install project if not already installed (with dev extras for pytest-asyncio)
+# Install project if not already installed. uv sync creates .venv and
+# installs exactly what uv.lock pins (with dev extras for pytest).
 if ! .venv/bin/python -c "import job_agent" 2>/dev/null; then
-    echo "[setup] Installing project dependencies..."
-    .venv/bin/pip install -e ".[dev]" -q
+    echo "[setup] Installing project dependencies (locked)..."
+    uv sync --extra dev --locked
 fi
 
 # Activate venv for the interactive session
