@@ -103,10 +103,3 @@ def group_by_cluster(jobs: Iterable[Job]) -> dict[str, list[Job]]:
     for j in jobs:
         groups.setdefault(cluster_key(j), []).append(j)
     return groups
-
-
-def canonical_and_siblings(jobs: list[Job], profile: dict) -> tuple[Job, list[Job]]:
-    """Return (canonical, siblings) where siblings excludes the canonical."""
-    canonical = pick_canonical(jobs, profile)
-    siblings = [j for j in jobs if j.id != canonical.id]
-    return canonical, siblings
