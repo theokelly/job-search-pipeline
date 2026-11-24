@@ -189,4 +189,5 @@ def test_agent_stance_in_prompt():
     messages = build_resume_rec_messages(_job(), _score(), RESUME, {})
     text = messages[0]["content"][0]["text"]
     assert "Stance on agents (canonical)" in text
-    assert "not autonomous agents" in text
+    assert "autonomous agent systems" in text
+    assert 'embedding "AI agents and tools"' in text

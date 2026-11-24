@@ -76,5 +76,6 @@ def test_agent_stance_in_checker_rules():
         profile={},
     )
     text = messages[0]["content"]
-    assert '"agentic"' in text
+    assert "autonomous agent systems" in text
+    assert "must not be flagged" in text
     assert "personal projects" in text

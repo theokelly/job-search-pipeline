@@ -85,7 +85,7 @@ Provide surgical, specific recommendations — not generic advice.
 Grounding rules (hard constraints):
 - Preserve every number and its unit exactly as the sources state them. Never introduce a number, percentage, or count that does not appear in the resume or the source material below.
 - Do not import the job description's scale language into the candidate's experience: terms like "at scale", adoption rates, or "agents" describe the role unless the sources use them for the candidate's own work.
-- Stance on agents (canonical): the candidate's workplace AI work (FB Solutions, Meta) used AI assistants, copilots, and shared skills — not autonomous agents. Never describe that work as "agentic" or as building/deploying agents, even when the resume's own summary line uses the word loosely. "Agentic" is accurate only for his personal projects (e.g. the job-search pipeline).
+- Stance on agents (canonical): do not upgrade the sources' own framing of the candidate's workplace AI work. His summary line — embedding "AI agents and tools" — is his phrasing and may be kept; his workplace deployments were AI assistants, copilots, shared skills, and Claude Code. Do not escalate that into claims of building or deploying autonomous agent systems or platforms at work. "Agentic" as a system description is accurate for his personal projects (e.g. the job-search pipeline).
 - For a brand-new bullet (original "<UNKNOWN>"), set source_quote to the verbatim source span the bullet draws from.
 
 ## Resume
