@@ -7,6 +7,8 @@ from typing import Optional
 import typer
 from dotenv import load_dotenv
 
+from .tiers import STRONG_FIT
+
 app = typer.Typer(help="Job search agent — discover, score, and generate application materials.")
 
 
@@ -143,7 +145,7 @@ def score(
 @app.command()
 def generate(
     user: str = typer.Option("theo", "--user"),
-    tiers: str = typer.Option("Strong Fit", "--tiers", help='Comma-separated tiers. Default: Strong Fit only — generate Worth Reviewing per-job from the UI, or pass --tiers "Strong Fit,Worth Reviewing"'),
+    tiers: str = typer.Option(STRONG_FIT, "--tiers", help='Comma-separated tiers. Default: Strong Fit only — generate Worth Reviewing per-job from the UI, or pass --tiers "Strong Fit,Worth Reviewing"'),
     force_all_status: bool = typer.Option(False, "--force-all-status", help="Also generate for jobs already marked applied / rejected / not pursuing (skipped by default)"),
 ):
     """Generate cover letters and resume recommendations."""
