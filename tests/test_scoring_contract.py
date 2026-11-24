@@ -99,6 +99,12 @@ def test_tier_enum_values():
     assert "Skip" in tier_enum
 
 
+def test_tier_enum_matches_tiers_module():
+    from job_agent.tiers import ALL_TIERS
+    tier_enum = SCORE_TOOL["input_schema"]["properties"]["tier"]["enum"]
+    assert tier_enum == list(ALL_TIERS)
+
+
 def _system_text(messages):
     return messages[0]["content"][0]["text"]
 

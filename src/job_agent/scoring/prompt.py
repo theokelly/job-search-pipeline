@@ -1,5 +1,6 @@
 from ..db import Job
 from .. import settings
+from ..tiers import ALL_TIERS
 
 # Tool schema used with Anthropic tool_use for structured output.
 SCORE_TOOL = {
@@ -10,7 +11,7 @@ SCORE_TOOL = {
         "properties": {
             "tier": {
                 "type": "string",
-                "enum": ["Strong Fit", "Worth Reviewing", "Long Shot", "Skip"],
+                "enum": list(ALL_TIERS),
                 "description": "Overall fit tier.",
             },
             "skill_fit": {
