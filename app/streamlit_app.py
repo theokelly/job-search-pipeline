@@ -20,7 +20,7 @@ os.chdir(Path(__file__).parent.parent)
 from dotenv import load_dotenv
 load_dotenv(".env")
 
-from sqlmodel import select, func
+from sqlmodel import select
 from src.job_agent.db import (
     init_db, get_session, get_or_create_meta,
     Job, Score, Application, User, UserJobMeta,
@@ -826,7 +826,6 @@ def render_job_detail(job_id: str):
         st.rerun()
 
     # Header
-    tier_label = sc.tier if sc else "Unscored"
     st.markdown(f"## {job.company} — {job.title}")
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
