@@ -209,12 +209,16 @@ def generate_resume_recommendation(job: Job, score: Score, resume_text: str, pro
                 for i, flags in violations.items())
             messages = messages + [
                 {"role": "assistant", "content": [tool_use]},
-                {"role": "user", "content":
-                    "Some edits failed grounding validation against the source "
-                    f"materials: {detail}. Rewrite the full recommendation: fix "
-                    "or drop those edits, keep the valid edits unchanged, and "
-                    "use only numbers and units that appear verbatim in the "
-                    "resume or source material."},
+                {"role": "user", "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content":
+                        "Some edits failed grounding validation against the source "
+                        f"materials: {detail}. Rewrite the full recommendation: fix "
+                        "or drop those edits, keep the valid edits unchanged, and "
+                        "use only numbers and units that appear verbatim in the "
+                        "resume or source material.",
+                }]},
             ]
 
     kept = []

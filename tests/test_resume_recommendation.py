@@ -43,18 +43,39 @@ def _score() -> Score:
 
 
 class _Block:
-    def __init__(self, payload):
+    def __init__(self, payload, block_id="toolu_test"):
         self.type = "tool_use"
         self.input = payload
+        self.id = block_id
 
 
 class _FakeMessages:
     def __init__(self, payloads):
         self._payloads = list(payloads)
         self.calls = 0
+        self.seen_messages = []
 
     def create(self, **kwargs):
         self.calls += 1
+        messages = kwargs["messages"]
+        self.seen_messages.append(messages)
+        # Model the API's hard rule: an assistant tool_use must be answered
+        # by a tool_result block in the immediately following user message.
+        # (The real API 400s otherwise; the fake accepted anything, which is
+        # how a malformed retry conversation shipped — Nov 24, 2026.)
+        for i, msg in enumerate(messages):
+            content = msg.get("content")
+            if msg.get("role") != "assistant" or not isinstance(content, list):
+                continue
+            for block in content:
+                if getattr(block, "type", None) != "tool_use":
+                    continue
+                nxt = messages[i + 1] if i + 1 < len(messages) else {}
+                blocks = nxt.get("content") if isinstance(nxt.get("content"), list) else []
+                assert nxt.get("role") == "user" and any(
+                    isinstance(b, dict) and b.get("type") == "tool_result"
+                    and b.get("tool_use_id") == block.id for b in blocks), \
+                    f"tool_use {block.id} not answered by a tool_result"
         payload = self._payloads.pop(0)
         return type("R", (), {"content": [_Block(payload)]})()
 
@@ -104,6 +125,24 @@ def test_violating_payload_retries_and_recovers(monkeypatch):
     assert "100%" not in out
     assert "Ran a 13-user pilot" in out
     assert dropped == []
+
+
+def test_retry_answers_tool_use_with_tool_result(monkeypatch):
+    """Regression (Nov 24, 2026): the corrective retry appended the
+    correction as a plain-text user message after the assistant tool_use;
+    the API rejects that with a 400 and generation died for any job whose
+    first-pass recommendation tripped the claim check."""
+    client = _install(monkeypatch, [_payload(BAD_EDIT), _payload(CLEAN_EDIT)])
+    generate_resume_recommendation(
+        _job(), _score(), RESUME, {}, profile_files=PROFILE_FILES)
+    retry_messages = client.messages.seen_messages[1]
+    assistant_msg, user_msg = retry_messages[-2], retry_messages[-1]
+    assert assistant_msg["role"] == "assistant"
+    assert user_msg["role"] == "user"
+    (result_block,) = user_msg["content"]
+    assert result_block["type"] == "tool_result"
+    assert result_block["tool_use_id"] == "toolu_test"
+    assert "grounding validation" in result_block["content"]
 
 
 def test_persistent_violation_drops_edit(monkeypatch):
