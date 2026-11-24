@@ -31,7 +31,14 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "httpx>=0.27.0",
+    "ruff>=0.9",
 ]
+
+# Lint: pyflakes rules only (unused imports/names, undefined names).
+# Deliberately no formatter and no style rules — see
+# docs/refactor-audit-2026-11-24.md (Phase B).
+[tool.ruff.lint]
+select = ["F"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/job_agent"]
