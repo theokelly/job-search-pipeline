@@ -309,7 +309,7 @@ def status(
             .group_by(Job.company)
             .order_by(func.count(Job.id).desc())
         ).all()
-        typer.echo(f"\n  Active jobs by company:")
+        typer.echo("\n  Active jobs by company:")
         for company, count in company_counts:
             typer.echo(f"    {company:<35} {count:>3}")
 

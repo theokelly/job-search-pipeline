@@ -433,7 +433,7 @@ def fetch_prescreen_batch(
     from ..scoring.prescreen import parse_prescreen_response
     from sqlmodel import select
 
-    profile = load_profile(profile_path)
+    load_profile(profile_path)  # validate the profile; the fetch itself needs only the batch
     init_db()
     saved = 0
     with get_session() as session:
