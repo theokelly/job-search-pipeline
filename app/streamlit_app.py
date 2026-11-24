@@ -29,6 +29,7 @@ from src.job_agent.pipeline import score_one, generate_one, mark_posting_status
 from src.job_agent.discovery.manual import fetch_from_url
 from src.job_agent.discovery.fetch import fetch_job_from_url, parse_ats_url
 from src.job_agent.tiers import STRONG_FIT, WORTH_REVIEWING, LONG_SHOT, SKIP
+from src.job_agent import mutations as _mutations
 from src.job_agent import queries as _queries
 from src.job_agent.queries import SOURCE_LABELS
 from src.job_agent.db import job_id as compute_job_id, upsert_job
@@ -174,42 +175,12 @@ load_job_detail = st.cache_data(ttl=30)(_queries.load_job_detail)
 
 
 def save_job_fields(job_id: str, company: str, title: str, location: str):
-    init_db()
-    with get_session() as s:
-        job = s.get(Job, job_id)
-        if job:
-            job.company = company.strip()
-            job.title = title.strip()
-            job.location = location.strip()
-            s.add(job)
-            s.commit()
+    _mutations.save_job_fields(job_id, company, title, location)
     st.cache_data.clear()
 
 
 def set_app_status(job_id: str, user_id: int, status: str):
-    """Update app_status for the clicked job AND every sibling in its cluster.
-
-    Siblings represent the same logical role posted across geographies; the user
-    only applies once, so the state should be consistent across all variants.
-    """
-    init_db()
-    with get_session() as s:
-        clicked = s.get(Job, job_id)
-        if not clicked:
-            return
-        target_key = clustering.cluster_key(clicked)
-        all_jobs = s.exec(select(Job)).all()
-        sibling_ids = [j.id for j in all_jobs if clustering.cluster_key(j) == target_key]
-
-        new_status = status if status != "clear" else None
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        for jid in sibling_ids:
-            meta = get_or_create_meta(s, jid, user_id)
-            meta.app_status = new_status
-            meta.app_status_at = now
-            meta.updated_at = now
-            s.add(meta)
-        s.commit()
+    _mutations.set_app_status(job_id, user_id, status)
     st.cache_data.clear()
 
 
@@ -799,28 +770,7 @@ def render_job_detail(job_id: str):
 # Add Job view (paste URL → fetch → review/edit → save)
 # ---------------------------------------------------------------------------
 def _save_manual_job(company: str, title: str, location: str, description: str, url: str) -> str:
-    """Insert/update a Job row from manual entry. Returns the job_id."""
-    init_db()
-    company = (company or "Unknown").strip()
-    title = (title or "Unknown Role").strip()
-    location = (location or "").strip()
-    job_db_id = compute_job_id(company, title, location)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    job = Job(
-        id=job_db_id,
-        source="manual",
-        company=company,
-        title=title,
-        location=location,
-        url=url.strip(),
-        description_raw=description or "",
-        first_seen=now,
-        last_seen=now,
-        status="active",
-    )
-    with get_session() as s:
-        upsert_job(s, job)
-        s.commit()
+    job_db_id = _mutations.save_manual_job(company, title, location, description, url)
     st.cache_data.clear()
     return job_db_id
 
