@@ -155,3 +155,38 @@ def test_persistent_violation_drops_edit(monkeypatch):
     assert "100%" not in out
     assert len(dropped) == 1
     assert "FB Solutions" in dropped[0]
+
+
+DROPPING_EDIT = {
+    "operation": "replace", "section": "FB Solutions",
+    "original": "Finance VP saved 8 hrs/wk; board prep cycle cut 25%",
+    "suggested": "Finance VP saved 8 hrs/wk; board prep cycle improved",
+    "reason": "brevity",
+}
+RESTORED_EDIT = {
+    "operation": "replace", "section": "FB Solutions",
+    "original": "Finance VP saved 8 hrs/wk; board prep cycle cut 25%",
+    "suggested": "Finance VP saved 8 hrs/wk; board prep cycle cut 25%",
+    "reason": "brevity",
+}
+FULL_PROFILE_FILES = {
+    "resume_base.md": "Finance VP saved 8 hrs/wk; board prep cycle cut 25%.",
+}
+
+
+def test_dropping_a_number_retries_and_recovers(monkeypatch):
+    """A suggestion that silently drops a number from its original trips
+    the claim gate even though it invents nothing (Coverflex, Nov 24)."""
+    client = _install(monkeypatch, [_payload(DROPPING_EDIT), _payload(RESTORED_EDIT)])
+    out = generate_resume_recommendation(
+        _job(), _score(), FULL_PROFILE_FILES["resume_base.md"], {},
+        profile_files=FULL_PROFILE_FILES)
+    assert client.messages.calls == 2
+    assert "cut 25%" in out
+
+
+def test_agent_stance_in_prompt():
+    messages = build_resume_rec_messages(_job(), _score(), RESUME, {})
+    text = messages[0]["content"][0]["text"]
+    assert "Stance on agents (canonical)" in text
+    assert "not autonomous agents" in text

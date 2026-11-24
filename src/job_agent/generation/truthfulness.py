@@ -59,6 +59,10 @@ Rules:
 - Soft claims ("excited about", "drawn to") need no grounding.
 - Flag: invented metrics, wrong titles/dates, skills the resume never mentions,
   programs or employers that don't appear in the materials.
+- Flag: describing his workplace AI work (FB Solutions, Meta) as "agentic" or
+  as building/deploying autonomous agents. His workplace tooling was AI
+  assistants, copilots, and shared skills; "agentic" is accurate only for his
+  personal projects (e.g. the job-search pipeline).
 - When in doubt, flag it — a false positive costs Theo ten seconds; a false
   negative goes to an employer under his name.
 - Return only the markdown report, no preamble."""

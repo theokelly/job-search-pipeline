@@ -73,3 +73,39 @@ def test_insert_requires_grounded_source_quote():
 
     fabricated = {**base, "source_quote": "Led a 500-person transformation"}
     assert check_edit(fabricated, _corpus(), require_quote=True)
+
+
+# --- Dropped-number check (Nov 24, 2026) -----------------------------------
+# The Coverflex regression: a generated edit compressed "board prep cycle
+# cut 25%" to "board prep cycle improved" — no invented number, so the
+# corpus check passed, but the quantified proof silently vanished.
+
+def _metrics_corpus():
+    return build_corpus(["Finance VP saved 8 hrs/wk; board prep cycle cut 25%."])
+
+
+def test_dropped_number_flagged():
+    flags = check_suggested(
+        "Finance VP saved 8 hrs/wk; board prep cycle improved",
+        _metrics_corpus(),
+        original="Finance VP saved 8 hrs/wk; board prep cycle cut 25%",
+    )
+    assert any("25%" in f and "original" in f for f in flags)
+
+
+def test_preserved_numbers_not_flagged():
+    flags = check_suggested(
+        "Board prep cut 25%; Finance VP saved 8 hrs/wk",
+        _metrics_corpus(),
+        original="Finance VP saved 8 hrs/wk; board prep cycle cut 25%",
+    )
+    assert flags == []
+
+
+def test_dropped_year_not_flagged():
+    flags = check_suggested(
+        "Managed an analytics team of 6",
+        _corpus(),
+        original="Managed an analytics team of 6 in 2024",
+    )
+    assert not any("2024" in f for f in flags)

@@ -5,8 +5,10 @@ dangerously hard numbers: a digit survives paraphrase while its unit mutates
 ("4 functions" -> "4 use cases"), or a percentage appears from nowhere
 ("100% adoption"). Numbers are mechanically checkable, so this module checks
 them mechanically: every numeral in a suggested edit must exist in the source
-corpus with a matching unit context, and a rephrase may not change the value
-attached to a unit its original used.
+corpus with a matching unit context, a rephrase may not change the value
+attached to a unit its original used, and a rephrase may not silently drop a
+number its original carried (compression deleting quantified proof — "board
+prep cut 25%" becoming "board prep improved" — is an upgrade in reverse).
 
 Semantic upgrades (scale language, invented negations) carry no numerals to
 catch; those are the LLM grounding check's job (generation.truthfulness).
@@ -142,12 +144,22 @@ def check_suggested(suggested: str, corpus: Corpus,
             flags.append(
                 f"'{claim.raw}' appears in the sources but not with this unit")
     if original:
-        orig = {c.primary_unit: c for c in extract_claims(original) if c.primary_unit}
-        sugg = {c.primary_unit: c for c in extract_claims(suggested) if c.primary_unit}
+        orig = {c.primary_unit: c for c in extract_claims(original)
+                if c.primary_unit and not c.is_year}
+        sugg = {c.primary_unit: c for c in extract_claims(suggested)
+                if c.primary_unit and not c.is_year}
         for unit, o in orig.items():
             s = sugg.get(unit)
             if s and s.key != o.key:
                 flags.append(f"'{unit}' changed from {o.raw} to {s.raw}")
+        sugg_keys = {c.key for c in extract_claims(suggested)}
+        flagged: set = set()
+        for o in extract_claims(original):
+            if o.is_year or o.key in sugg_keys or o.key in flagged:
+                continue
+            flagged.add(o.key)
+            flags.append(
+                f"'{o.raw}' from the original text does not appear in the suggestion")
     return flags
 
 

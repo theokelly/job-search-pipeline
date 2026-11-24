@@ -65,3 +65,16 @@ def test_document_label_in_prompt():
     text = messages[0]["content"]
     assert "## Resume recommendation to verify" in text
     assert "in the resume recommendation" in text
+
+
+def test_agent_stance_in_checker_rules():
+    messages = build_grounding_check_messages(
+        _job(), _score(),
+        document="I deployed agentic tooling at FB Solutions.",
+        resume_text="Analyst at Initech.",
+        starls_text="",
+        profile={},
+    )
+    text = messages[0]["content"]
+    assert '"agentic"' in text
+    assert "personal projects" in text
