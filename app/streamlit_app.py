@@ -286,39 +286,6 @@ def load_jobs_df(include_inactive: bool = False):
 
 
 @st.cache_data(ttl=30)
-def load_screened_out_df():
-    """Load jobs that were rejected by the Haiku prescreen."""
-    init_db()
-    with get_session() as s:
-        user = s.exec(select(User).where(User.slug == "theo")).first()
-        if not user:
-            return pd.DataFrame(), None
-
-        metas = s.exec(
-            select(UserJobMeta).where(
-                UserJobMeta.user_id == user.id,
-                UserJobMeta.prescreen_status == "rejected",
-            )
-        ).all()
-
-        rows = []
-        for meta in metas:
-            job = s.get(Job, meta.job_id)
-            if not job:
-                continue
-            rows.append({
-                "id": job.id,
-                "company": job.company,
-                "title": job.title,
-                "location": job.location,
-                "source": SOURCE_LABELS.get(job.source, job.source),
-                "rejection_reason": (meta.prescreen_reason or "").replace("REJECT - ", "").replace("REJECT", "").strip(" -"),
-                "has_jd": len((job.description_raw or "").strip()) >= 100,
-            })
-        return pd.DataFrame(rows), user.id
-
-
-@st.cache_data(ttl=30)
 def load_stats_timeseries():
     """Temporal data for the Stats-page journey view.
 
