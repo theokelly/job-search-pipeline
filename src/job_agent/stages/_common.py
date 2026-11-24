@@ -11,7 +11,6 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 from ..db import (
     init_db, get_session, upsert_job, get_or_create_meta,
@@ -19,6 +18,29 @@ from ..db import (
 )
 from .. import settings
 from .. import clustering
+
+# This module is the stages package's shared hub: sibling stage modules
+# import the db names, settings, and clustering from here rather than
+# reaching across the package themselves. __all__ makes that re-export
+# contract explicit.
+__all__ = [
+    "PROFILE_PATH_DEFAULT",
+    "NARRATIVE_PATH",
+    "_default_echo",
+    "_replicate_score",
+    "logged_run",
+    "init_db",
+    "get_session",
+    "upsert_job",
+    "get_or_create_meta",
+    "Job",
+    "Score",
+    "Application",
+    "User",
+    "UserJobMeta",
+    "settings",
+    "clustering",
+]
 
 
 PROFILE_PATH_DEFAULT = "profile/theo.yaml"

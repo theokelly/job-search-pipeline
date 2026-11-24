@@ -41,4 +41,12 @@ __all__ = [
     "INGESTED",
     "ALREADY_PRESENT",
     "FETCH_FAILED",
+    # Private helpers, re-exported deliberately: tests and the eval
+    # harness import them from here (see docstring above).
+    "_default_echo",
+    "_replicate_score",
+    "_RateLimiter",
+    "_plan_scoring",
+    "_prescreen_filter",
+    "_score_batch",
 ]

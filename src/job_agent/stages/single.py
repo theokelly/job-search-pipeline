@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ._common import (
     PROFILE_PATH_DEFAULT, NARRATIVE_PATH, init_db, get_session,
-    get_or_create_meta, Job, Score, Application, User, UserJobMeta,
+    get_or_create_meta, Job, Score, Application, User,
 )
 
 
