@@ -1,7 +1,7 @@
 """
 Pipeline orchestration — thin re-export shim.
 
-The stage implementations live in `stages/` (see PLAN.md Phase B1):
+The stage implementations live in `stages/`:
     stages/discover.py      run_discover
     stages/housekeeping.py  run_sweep, run_prune_closed
     stages/score.py         run_score, fetch_score_batch, fetch_prescreen_batch
