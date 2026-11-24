@@ -1,6 +1,5 @@
 """Tests for the resume mirror (profile/resume_base.md, generated from the
 live Drive base). Drive is faked — no network, no credentials."""
-import pytest
 from job_agent import resume_mirror
 
 STAMP = "2026-11-19T10:00:00.000Z"

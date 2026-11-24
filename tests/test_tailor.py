@@ -1,5 +1,4 @@
 """Tests for tailor.py: rec parsing, budgets, PPTX edit application."""
-import pytest
 from pptx import Presentation
 from pptx.util import Inches
 

@@ -23,7 +23,7 @@ load_dotenv(".env")
 from sqlmodel import select
 from src.job_agent.db import (
     init_db, get_session, get_or_create_meta,
-    Job, Score, Application, User, UserJobMeta,
+    Job, Score,
 )
 from src.job_agent.pipeline import score_one, generate_one, mark_posting_status
 from src.job_agent.discovery.manual import fetch_from_url

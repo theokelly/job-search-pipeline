@@ -1,5 +1,3 @@
-import os
-import pytest
 from job_agent import resume_mirror
 from job_agent.doctor import (
     Report, check_env, check_profile, check_resume_sync, run_doctor,

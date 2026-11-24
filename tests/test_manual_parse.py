@@ -6,7 +6,6 @@ same way so the JSON-LD / __NEXT_DATA__ cascade order is what's tested.
 """
 import json
 
-import pytest
 from bs4 import BeautifulSoup
 
 from job_agent.discovery import manual
