@@ -167,6 +167,12 @@ Bulk generate skips jobs you've already marked applied / rejected / not pursuing
 
 Prefer a UI? `bash run_ui.sh` starts Streamlit at http://localhost:8501 — review scores, generate materials per job, and tailor resumes from the browser.
 
+## Operations
+
+The production deployment runs on an always-on VM: the Docker `dev` service hosts both the scheduled CLI runs and the Streamlit UI (port 8501). A cron wrapper runs the pipeline at 07:30 Mon–Fri (Europe/Amsterdam) — Monday is the full run (`run --email --fanout`), Tue–Fri are email-only (`run --email`) — with logs kept per day. Nothing auto-submits applications; generation and submission stay human-triggered.
+
+Ad-hoc additions go through the same gate as discovered jobs: `job-agent ingest <url> [<url> …]` fetches and stores postings, and `--score` also prescreens and scores them. `job-agent prune-closed` (also part of `run`) marks postings that have closed or expired so they leave the active pool.
+
 ## The profile
 
 Everything personal lives in gitignored `profile/`: resume versions, STAR stories, cover-letter principles, target roles and geography, scoring preferences, and vetted application answers. `profile_template/example.yaml` documents the full schema — copy it and fill in your own. (It was generated from a real profile by `scripts/build_profile_template.py`, which redacts identity, secrets, and personal answers; re-run it after changing your profile.)
@@ -189,9 +195,13 @@ Materials generate for Strong Fit only by default; Worth Reviewing letters are p
 
 - **Human in the loop.** The pipeline drafts; you review, edit, and submit. End-to-end automation is deliberately off the table.
 - **Batches API for scoring.** 50% cheaper than synchronous calls. Prompt-cache hits inside a batch are best-effort (concurrent requests usually miss), so the discount — not caching — is the real saving.
-- **Drive as source of truth (optional).** STAR stories and brag sheet can sync from Google Docs; generation auto-syncs with a 15-minute staleness guard and never breaks when Drive is unreachable.
+- **Drive as source of truth (optional).** STAR stories and brag sheet can sync from Google Docs; generation entry points sync first (an explicit step with a 15-minute staleness guard) and never break when Drive is unreachable.
 
 `OVERVIEW.md` has the architecture quick reference.
+
+## Eval harness
+
+A golden-case harness guards scoring quality: `evals/run_evals.py` replays 13 curated postings (JD text, expected prescreen decision, expected tier and subscores) through the live prescreen and scoring prompts. Prescreen must match exactly; scoring is banded (±15 per subscore) and misses are warnings. Results are committed to `evals/results/` — the series is the variance record. The case set lives in `evals/golden_cases.json` (gitignored; build it with `scripts/build_golden_cases.py`).
 
 ## License
 
