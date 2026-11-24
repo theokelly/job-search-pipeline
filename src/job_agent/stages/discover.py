@@ -80,7 +80,7 @@ def run_discover(
     fanout_kept: list = []
     _canon_url = None
     if include_fanout:
-        from ..discovery.fanout import normalize_url as _canon_url_fn
+        from ..discovery.fetch import normalize_url as _canon_url_fn
 
         _canon_url = _canon_url_fn
         with get_session() as _s:
@@ -255,7 +255,7 @@ def run_discover(
     # that company's board belongs in target_companies, where the board API
     # gives fresher, complete coverage than the search index.
     if include_fanout and fanout_kept:
-        from ..discovery.fanout import parse_ats_url
+        from ..discovery.fetch import parse_ats_url
 
         listed = {
             (c.get("name") or "").lower()

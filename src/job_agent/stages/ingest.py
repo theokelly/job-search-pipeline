@@ -11,7 +11,7 @@ from typing import Callable, Optional
 from sqlmodel import select
 
 from ..db import Job, get_session, init_db, upsert_job
-from ..discovery.fanout import fetch_job_from_url
+from ..discovery.fetch import fetch_job_from_url
 from ._common import _default_echo
 
 INGESTED = "ingested"
