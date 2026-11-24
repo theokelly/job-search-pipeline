@@ -37,7 +37,7 @@ def score_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEFAUL
 
 def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEFAULT) -> Path:
     """Generate materials for a single job (used by Streamlit)."""
-    from ..config import load_profile, load_profile_files
+    from ..config import ensure_profile_fresh, load_profile, load_profile_files
     from ..generation.cover_letter import generate_cover_letter
     from ..generation.resume_recommendation import generate_resume_recommendation
     from ..generation.application_answers import generate_application_answers
@@ -47,7 +47,8 @@ def generate_one(job_id: str, user_id: int, profile_path: str = PROFILE_PATH_DEF
     from sqlmodel import select
 
     profile = load_profile(profile_path)
-    profile_files = load_profile_files(profile=profile)
+    ensure_profile_fresh(profile)
+    profile_files = load_profile_files()
 
     init_db()
     with get_session() as session:

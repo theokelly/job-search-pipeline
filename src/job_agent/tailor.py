@@ -449,9 +449,10 @@ def _grounding_filter(edits: list[dict], profile: dict) -> tuple[list[dict], lis
     corpus returns the edits untouched — the tailor must never break on this.
     """
     try:
-        from .config import load_profile_files
+        from .config import ensure_profile_fresh, load_profile_files
         from .generation.claim_check import build_corpus, check_edit
-        files = load_profile_files(profile=profile)
+        ensure_profile_fresh(profile)
+        files = load_profile_files()
         if not files:
             return edits, []
         corpus = build_corpus(list(files.values()))

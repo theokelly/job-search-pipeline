@@ -50,7 +50,7 @@ def run_generate(
     """Generate materials for all scored-but-unmaterialized jobs. Returns list
     of (job, score, out_dir) tuples. Jobs already marked applied / rejected /
     not pursuing are skipped unless force_all_status is set."""
-    from ..config import load_profile, load_profile_files
+    from ..config import ensure_profile_fresh, load_profile, load_profile_files
     from ..generation.cover_letter import generate_cover_letter
     from ..generation.resume_recommendation import generate_resume_recommendation
     from ..generation.application_answers import generate_application_answers
@@ -61,7 +61,8 @@ def run_generate(
 
     target_tiers = [t.strip() for t in tiers.split(",")]
     profile = load_profile(profile_path)
-    profile_files = load_profile_files(profile=profile)
+    ensure_profile_fresh(profile)
+    profile_files = load_profile_files()
 
     init_db()
     outputs: list = []

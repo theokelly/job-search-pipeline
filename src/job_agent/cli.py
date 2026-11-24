@@ -467,14 +467,15 @@ def refresh_recs(
     from datetime import datetime, timedelta, timezone
     from pathlib import Path
     from .db import init_db, get_session, Job, Score, User, Application
-    from .config import load_profile, load_profile_files
+    from .config import ensure_profile_fresh, load_profile, load_profile_files
     from .generation.resume_recommendation import generate_resume_recommendation
     from .tailor import budgets_from_markdown
     from sqlmodel import select
 
     init_db()
     profile = load_profile("profile/theo.yaml")
-    profile_files = load_profile_files(profile=profile)
+    ensure_profile_fresh(profile)
+    profile_files = load_profile_files()
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
     with get_session() as session:

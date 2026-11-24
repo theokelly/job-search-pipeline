@@ -94,19 +94,23 @@ def _maybe_refresh_mirror(profile: dict) -> None:
         print("[profile] resume mirror refreshed from the Drive base", file=sys.stderr)
 
 
-def load_profile_files(rel_paths: tuple[str, ...] | list[str] = GENERATION_PROFILE_FILES,
-                       profile: dict | None = None) -> dict[str, str]:
+def ensure_profile_fresh(profile: dict) -> None:
+    """Run the Drive sync + resume-mirror refresh for a profile, when its
+    profile_sync config enables them. Explicit step (Phase G): callers that
+    want fresh-from-Drive profile files call this BEFORE load_profile_files;
+    load_profile_files itself only reads what is on disk. Never raises —
+    failures warn and local files are used."""
+    _maybe_sync_profile(profile)
+    _maybe_refresh_mirror(profile)
+
+
+def load_profile_files(rel_paths: tuple[str, ...] | list[str] = GENERATION_PROFILE_FILES) -> dict[str, str]:
     """Load profile files into a dict keyed by their path under profile/.
 
     Missing files map to empty strings so generation can degrade gracefully if
     the resume mirror or an accomplishments file is not yet populated.
-
-    When profile is given and profile_sync.sync_on_load is true, Drive files
-    are synced first (failures warn, never raise).
+    Pure disk read — see ensure_profile_fresh for the Drive sync step.
     """
-    if profile is not None:
-        _maybe_sync_profile(profile)
-        _maybe_refresh_mirror(profile)
     out: dict[str, str] = {}
     for rel_path in rel_paths:
         key = rel_path.replace("profile/", "")
@@ -114,7 +118,7 @@ def load_profile_files(rel_paths: tuple[str, ...] | list[str] = GENERATION_PROFI
             out[key] = load_text(rel_path)
         except FileNotFoundError:
             out[key] = ""
-    # The resume mirror of the live Drive base (refreshed above when stale)
+    # The resume mirror of the live Drive base (refreshed by ensure_profile_fresh)
     mirror = Path("profile/resume_base.md")
     if mirror.exists():
         out["resume_base.md"] = mirror.read_text()

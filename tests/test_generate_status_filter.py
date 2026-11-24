@@ -33,6 +33,7 @@ def engine(tmp_path, monkeypatch):
     monkeypatch.setattr(gen, "get_session",
                         lambda: Session(eng, expire_on_commit=False))
     monkeypatch.setattr("job_agent.config.load_profile", lambda path: object())
+    monkeypatch.setattr("job_agent.config.ensure_profile_fresh", lambda profile: None)
     monkeypatch.setattr("job_agent.config.load_profile_files",
                         lambda profile=None: {"resume_versions/ai_focused.md": "resume"})
     monkeypatch.setattr("job_agent.generation.cover_letter.generate_cover_letter",

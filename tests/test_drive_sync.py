@@ -242,10 +242,9 @@ def test_maybe_sync_runs_when_enabled(monkeypatch, tmp_path, capsys):
     local.mkdir(parents=True)
     (local / "starls.md").write_text("old")
     (local / "brag_sheet.md").write_text("# Brag\n\nsame")
-    files = config.load_profile_files(
-        ["profile/accomplishments/starls.md"],
-        profile=_profile_with_sync(True),
-    )
+    profile = _profile_with_sync(True)
+    config.ensure_profile_fresh(profile)
+    files = config.load_profile_files(["profile/accomplishments/starls.md"])
     # sync ran and updated the stale file before loading
     assert files["accomplishments/starls.md"].splitlines()[0] == "# STARLs"
     assert "synced from Drive" in capsys.readouterr().err
@@ -258,10 +257,9 @@ def test_maybe_sync_skipped_when_disabled(monkeypatch, tmp_path):
     local = tmp_path / "profile/accomplishments"
     local.mkdir(parents=True)
     (local / "starls.md").write_text("old")
-    files = config.load_profile_files(
-        ["profile/accomplishments/starls.md"],
-        profile=_profile_with_sync(False),
-    )
+    profile = _profile_with_sync(False)
+    config.ensure_profile_fresh(profile)
+    files = config.load_profile_files(["profile/accomplishments/starls.md"])
     assert files["accomplishments/starls.md"] == "old"
 
 
@@ -273,10 +271,9 @@ def test_maybe_sync_failure_falls_back_to_local(monkeypatch, tmp_path, capsys):
     local = tmp_path / "profile/accomplishments"
     local.mkdir(parents=True)
     (local / "starls.md").write_text("old")
-    files = config.load_profile_files(
-        ["profile/accomplishments/starls.md"],
-        profile=_profile_with_sync(True),
-    )
+    profile = _profile_with_sync(True)
+    config.ensure_profile_fresh(profile)
+    files = config.load_profile_files(["profile/accomplishments/starls.md"])
     assert files["accomplishments/starls.md"] == "old"
     assert "auto-sync failed" in capsys.readouterr().err
 
@@ -292,10 +289,9 @@ def test_staleness_guard_skips_recent_sync(monkeypatch, tmp_path):
     called = []
     monkeypatch.setattr("job_agent.drive_sync.sync_profile_files",
                         lambda *a, **k: called.append(1) or [])
-    config.load_profile_files(
-        ["profile/accomplishments/starls.md"],
-        profile=_profile_with_sync(True),
-    )
+    profile = _profile_with_sync(True)
+    config.ensure_profile_fresh(profile)
+    config.load_profile_files(["profile/accomplishments/starls.md"])
     assert called == []  # skipped: synced <15 min ago
 
 
@@ -309,9 +305,8 @@ def test_staleness_guard_runs_when_stale(monkeypatch, tmp_path):
     (tmp_path / "profile/accomplishments").mkdir(parents=True)
     (tmp_path / "profile/accomplishments/starls.md").write_text("old")
     (tmp_path / "profile/accomplishments/brag_sheet.md").write_text("# Brag\n\nsame")
-    config.load_profile_files(
-        ["profile/accomplishments/starls.md"],
-        profile=_profile_with_sync(True),
-    )
+    profile = _profile_with_sync(True)
+    config.ensure_profile_fresh(profile)
+    config.load_profile_files(["profile/accomplishments/starls.md"])
     # stamp refreshed by the sync
     assert float((tmp_path / "data/.drive_sync_last").read_text()) > time.time() - 60
