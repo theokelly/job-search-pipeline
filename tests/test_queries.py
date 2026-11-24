@@ -1,0 +1,89 @@
+"""Tests for job_agent.queries — the UI read models (Phase F).
+
+Fixture DB in tmp (pattern from test_single.py): monkeypatch the
+module's init_db/get_session so the loaders hit an in-memory-ish
+sqlite file, never the real data/jobs.sqlite.
+"""
+from datetime import datetime
+
+import pytest
+from sqlmodel import SQLModel, Session, create_engine
+
+from job_agent import queries
+from job_agent.db import Application, Job, Score, User, UserJobMeta
+from job_agent.tiers import STRONG_FIT, WORTH_REVIEWING
+
+
+@pytest.fixture()
+def engine(tmp_path, monkeypatch):
+    eng = create_engine(f"sqlite:///{tmp_path}/jobs.sqlite")
+    SQLModel.metadata.create_all(eng)
+    monkeypatch.setattr(queries, "init_db", lambda *a, **k: eng)
+    monkeypatch.setattr(queries, "get_session",
+                        lambda *a, **k: Session(eng, expire_on_commit=False))
+    return eng
+
+
+def _seed_user(engine):
+    with Session(engine) as s:
+        u = User(slug="theo", profile_path="profile/theo.yaml")
+        s.add(u)
+        s.commit()
+        s.refresh(u)
+        return u.id
+
+
+def _score(job_id, uid, tier, when):
+    return Score(job_id=job_id, user_id=uid, tier=tier, skill_fit=50,
+                 preference_alignment=50, recommended_resume_version="base",
+                 gap_assessment="g", positioning_notes="p", rationale="r",
+                 raw_response="{}", scored_at=when)
+
+
+def _job(jid, company="Acme", title="Head of AI", source="greenhouse",
+         status="active", first_seen=datetime(2026, 11, 1, 9, 0),
+         location="Amsterdam, Netherlands", description="x" * 150):
+    return Job(id=jid, source=source, company=company, title=title,
+               location=location, url=f"https://x/{jid}",
+               description_raw=description, status=status,
+               first_seen=first_seen)
+
+
+def test_stats_timeseries_funnel_and_latest_score(engine):
+    uid = _seed_user(engine)
+    with Session(engine) as s:
+        s.add(_job("j1"))
+        s.add(_job("j2", source="linkedin_search",
+                   first_seen=datetime(2026, 11, 2, 9, 0)))
+        # j1 scored twice — only the latest counts.
+        s.add(_score("j1", uid, WORTH_REVIEWING, datetime(2026, 11, 3, 9, 0)))
+        s.add(_score("j1", uid, STRONG_FIT, datetime(2026, 11, 4, 9, 0)))
+        s.add(UserJobMeta(job_id="j1", user_id=uid, prescreen_status="approved",
+                          app_status="applied",
+                          app_status_at=datetime(2026, 11, 5, 9, 0)))
+        s.add(UserJobMeta(job_id="j2", user_id=uid, prescreen_status="rejected"))
+        s.add(Application(job_id="j1", user_id=uid,
+                          materials_path="outputs/theo/2026-11-20_acme_head-of-ai/x"))
+        s.commit()
+
+    out = queries.load_stats_timeseries()
+    funnel = dict(out["funnel"])
+    assert funnel["Discovered"] == 2
+    assert funnel["Prescreen passed"] == 1
+    assert funnel["Scored"] == 1
+    assert funnel["Strong / Worth"] == 1  # latest score only
+    assert funnel["Materials made"] == 1
+    assert funnel["Applied"] == 1
+    assert out["cost_counts"]["prescreen"] == 2
+    assert out["cost_counts"]["cover_letter_strong"] == 1
+    sources = set(out["discovery"]["source"])
+    assert sources == {"Greenhouse", "LinkedIn Search"}  # SOURCE_LABELS applied
+    journey = out["journey"]
+    assert len(journey) == 1 and journey.iloc[0]["company"] == "Acme"
+
+
+def test_stats_timeseries_empty_db(engine):
+    _seed_user(engine)
+    out = queries.load_stats_timeseries()
+    assert dict(out["funnel"])["Discovered"] == 0
+    assert out["cost_counts"]["score"] == 0
