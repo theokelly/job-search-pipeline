@@ -17,14 +17,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).parent.parent))
 os.chdir(Path(__file__).parent.parent)
 
-from dotenv import load_dotenv
-load_dotenv(".env")
-
-from sqlmodel import select
-from src.job_agent.db import (
-    init_db, get_session, get_or_create_meta,
-    Job, Score,
-)
+from src.job_agent.db import Score
 from src.job_agent.pipeline import score_one, generate_one, mark_posting_status
 from src.job_agent.discovery.manual import fetch_from_url
 from src.job_agent.discovery.fetch import fetch_job_from_url, parse_ats_url
@@ -32,8 +25,6 @@ from src.job_agent.tiers import STRONG_FIT, WORTH_REVIEWING, LONG_SHOT, SKIP
 from src.job_agent import mutations as _mutations
 from src.job_agent import queries as _queries
 from src.job_agent.queries import SOURCE_LABELS
-from src.job_agent.db import job_id as compute_job_id, upsert_job
-from src.job_agent import clustering
 from src.job_agent.config import load_env, load_profile
 
 load_env()
