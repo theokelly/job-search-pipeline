@@ -7,15 +7,19 @@ the generation entry points.
 from job_agent import config
 
 
-def test_load_profile_files_does_not_sync(monkeypatch):
+def test_load_profile_files_does_not_sync(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(config, "_maybe_sync_profile", lambda p: calls.append("sync"))
     monkeypatch.setattr(config, "_maybe_refresh_mirror", lambda p: calls.append("mirror"))
+    # Hermetic profile tree (the mirror key only appears when the file exists).
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "profile/resume_base.md").write_text("mirror")
     out = config.load_profile_files()
     assert calls == []
     # The generation file keys are always present (missing files -> "").
     assert "narrative_guidance.md" in out
-    assert "resume_base.md" in out
+    assert out["resume_base.md"] == "mirror"
 
 
 def test_ensure_profile_fresh_runs_both_steps(monkeypatch):

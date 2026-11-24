@@ -41,6 +41,10 @@ def test_check_never_raises(monkeypatch):
     """If the API call fails, check_grounding returns a REVIEW report."""
     import job_agent.generation.truthfulness as mod
 
+    # check_grounding reads the key before constructing the client; without
+    # one it short-circuits and Boom never runs (cleanroom CI has no key).
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
     class Boom:
         def __init__(self, *a, **k):
             raise RuntimeError("no network")
