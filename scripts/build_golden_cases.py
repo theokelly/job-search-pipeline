@@ -38,6 +38,7 @@ SPECS = [
     ("case_10", "242042e8", "rejected", None, None, None),       # Databricks FDE IC - pure engineering delivery
     ("case_11", "3ad2ee80", "rejected", None, None, None),       # Adyen Senior FDE - IC delivery
     ("case_12", "a1ee65d5", "rejected", None, None, None),       # Prosus Visual Design Intern
+    ("case_13", "7a6e2c7c", "approved", "Worth Reviewing", 62, 68),  # EPAM Program Director - JD says "Amsterdam and Eindhoven" hybrid; originally rejected as an Eindhoven commute. Guards the multi-location geography clarification added to theo.yaml 2026-11-24; refs are the production score after the fix
 ]
 
 OUT = Path("evals/golden_cases.json")
