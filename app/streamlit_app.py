@@ -33,7 +33,9 @@ from src.job_agent import queries as _queries
 from src.job_agent.queries import SOURCE_LABELS
 from src.job_agent.db import job_id as compute_job_id, upsert_job
 from src.job_agent import clustering
-from src.job_agent.config import load_profile
+from src.job_agent.config import load_env, load_profile
+
+load_env()
 
 # ---------------------------------------------------------------------------
 # Page config

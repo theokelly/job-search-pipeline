@@ -22,7 +22,10 @@ from pathlib import Path
 
 from sqlmodel import select
 
+from job_agent.config import load_env
 from job_agent.db import init_db, get_session, Job
+
+load_env()
 
 # slug, job id prefix, expected prescreen, expected tier, ref skill, ref pref
 SPECS = [

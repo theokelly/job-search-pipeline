@@ -4,8 +4,13 @@ import yaml
 from dotenv import load_dotenv
 
 
-load_dotenv("data/secrets.env", override=False)
-load_dotenv(".env", override=False)
+def load_env() -> None:
+    """Load .env files into the process environment (data/secrets.env,
+    then .env; variables already set win). Entry points call this
+    explicitly — importing this module has no side effects (Phase G;
+    previously the loads ran at import time)."""
+    load_dotenv("data/secrets.env", override=False)
+    load_dotenv(".env", override=False)
 
 
 class ProfileError(ValueError):

@@ -24,3 +24,16 @@ def test_ensure_profile_fresh_runs_both_steps(monkeypatch):
     monkeypatch.setattr(config, "_maybe_refresh_mirror", lambda p: calls.append("mirror"))
     config.ensure_profile_fresh({"profile_sync": {}})
     assert calls == ["sync", "mirror"]
+
+
+def test_load_env_reads_dotenv_without_overriding(monkeypatch, tmp_path):
+    import os
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("JOB_AGENT_TEST_SENTINEL=from-file\n")
+    monkeypatch.delenv("JOB_AGENT_TEST_SENTINEL", raising=False)
+    config.load_env()
+    assert os.environ["JOB_AGENT_TEST_SENTINEL"] == "from-file"
+    # A variable already set wins over the file (override=False).
+    (tmp_path / ".env").write_text("JOB_AGENT_TEST_SENTINEL=changed\n")
+    config.load_env()
+    assert os.environ["JOB_AGENT_TEST_SENTINEL"] == "from-file"

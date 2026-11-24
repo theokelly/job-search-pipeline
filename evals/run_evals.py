@@ -32,11 +32,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from job_agent.config import load_profile, load_text  # noqa: E402
+from job_agent.config import load_env, load_profile, load_text  # noqa: E402
 from job_agent.db import Job  # noqa: E402
 from job_agent.scoring.prescreen import prescreen_job  # noqa: E402
 from job_agent.scoring.score import score_job  # noqa: E402
 from job_agent.stages._common import NARRATIVE_PATH, PROFILE_PATH_DEFAULT  # noqa: E402
+
+load_env()
 
 BAND = 15
 CASES_PATH = Path("evals/golden_cases.json")

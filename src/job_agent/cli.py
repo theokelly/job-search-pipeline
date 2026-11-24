@@ -5,8 +5,8 @@ all orchestration lives in pipeline.py so the Streamlit UI can share it.
 from typing import Optional
 
 import typer
-from dotenv import load_dotenv
 
+from .config import load_env
 from .tiers import STRONG_FIT
 
 app = typer.Typer(help="Job search agent — discover, score, and generate application materials.")
@@ -14,8 +14,7 @@ app = typer.Typer(help="Job search agent — discover, score, and generate appli
 
 def _bootstrap() -> None:
     """Load env vars. Called at the top of every command."""
-    load_dotenv("data/secrets.env", override=False)
-    load_dotenv(".env", override=False)
+    load_env()
 
 
 def _print_discover_summary(counts: dict, dry_run: bool, indent: str = "") -> None:
