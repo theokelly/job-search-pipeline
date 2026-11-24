@@ -168,37 +168,7 @@ load_jobs_df = st.cache_data(ttl=30)(_queries.load_jobs_df)
 load_stats_timeseries = st.cache_data(ttl=30)(_queries.load_stats_timeseries)
 
 
-def load_job_detail(job_id: str):
-    """Load full detail for a single job."""
-    init_db()
-    with get_session() as s:
-        user = s.exec(select(User).where(User.slug == "theo")).first()
-        user_id = user.id if user else None
-        job = s.get(Job, job_id)
-        sc = None
-        meta = None
-        app = None
-        if user_id and job:
-            all_scores = s.exec(
-                select(Score).where(
-                    Score.job_id == job_id,
-                    Score.user_id == user_id,
-                ).order_by(Score.scored_at.desc())
-            ).all()
-            sc = all_scores[0] if all_scores else None
-            meta = s.exec(
-                select(UserJobMeta).where(
-                    UserJobMeta.job_id == job_id,
-                    UserJobMeta.user_id == user_id,
-                )
-            ).first()
-            app = s.exec(
-                select(Application).where(
-                    Application.job_id == job_id,
-                    Application.user_id == user_id,
-                )
-            ).first()
-        return job, sc, meta, app, user_id
+load_job_detail = _queries.load_job_detail  # was uncached in the view too; the other two loaders carry the ttl=30 cache
 
 
 def save_job_fields(job_id: str, company: str, title: str, location: str):

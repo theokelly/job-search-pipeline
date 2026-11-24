@@ -118,3 +118,23 @@ def test_load_jobs_df_tiers_clusters_and_inactive(engine):
 
     df_all, _ = queries.load_jobs_df(include_inactive=True)
     assert "c1" in set(df_all["id"])
+
+
+def test_load_job_detail_returns_latest_score_and_parts(engine):
+    uid = _seed_user(engine)
+    with Session(engine) as s:
+        s.add(_job("j1"))
+        s.add(_score("j1", uid, WORTH_REVIEWING, datetime(2026, 11, 3, 9, 0)))
+        s.add(_score("j1", uid, STRONG_FIT, datetime(2026, 11, 4, 9, 0)))
+        s.add(UserJobMeta(job_id="j1", user_id=uid, prescreen_status="approved"))
+        s.add(Application(job_id="j1", user_id=uid, materials_path="outputs/x"))
+        s.commit()
+
+    job, sc, meta, app, user_id = queries.load_job_detail("j1")
+    assert job.id == "j1" and user_id == uid
+    assert sc.tier == STRONG_FIT  # latest
+    assert meta.prescreen_status == "approved"
+    assert app.materials_path == "outputs/x"
+
+    job2, sc2, meta2, app2, _ = queries.load_job_detail("nope")
+    assert job2 is None and sc2 is None and meta2 is None and app2 is None
