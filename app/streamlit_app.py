@@ -170,7 +170,7 @@ load_jobs_df = st.cache_data(ttl=30)(_queries.load_jobs_df)
 load_stats_timeseries = st.cache_data(ttl=30)(_queries.load_stats_timeseries)
 
 
-load_job_detail = _queries.load_job_detail  # was uncached in the view too; the other two loaders carry the ttl=30 cache
+load_job_detail = st.cache_data(ttl=30)(_queries.load_job_detail)
 
 
 def save_job_fields(job_id: str, company: str, title: str, location: str):
