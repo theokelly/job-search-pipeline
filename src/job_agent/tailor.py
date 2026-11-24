@@ -296,6 +296,8 @@ def apply_edits(pptx_path: Path | str, edits: list[dict],
         return counts
 
     before = frame_counts()
+    from . import layout_check
+    layout_before = layout_check.snapshot_lines(prs)
     applied, skipped, flagged = [], [], []
 
     for edit in edits:
@@ -321,6 +323,10 @@ def apply_edits(pptx_path: Path | str, edits: list[dict],
                 "section": "", "operation": "overflow-check", "status": "flagged",
                 "detail": f"a text frame grew {before_n} -> {after_n} chars; eyeball it",
             })
+
+    # Render-aware check: char counts miss wrap changes (same length, more
+    # lines). Flag any shape the edits pushed past the next element.
+    flagged.extend(layout_check.flags_from_snapshot(prs, layout_before))
 
     if not dry_run:
         output_path.parent.mkdir(parents=True, exist_ok=True)
