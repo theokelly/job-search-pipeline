@@ -109,3 +109,7 @@ The compose `dev` service volume-mounts the whole checkout (`.:/workspace`); the
 2. A phase merges into the production checkout only at a chosen moment — never 07:15–07:45 — after confirming no run is in flight (cron log + `docker ps`). Post-merge, in the production checkout: full pytest, the eval harness where the phase touched discovery/prescreen/scoring, then push. Any disagreement reverts before the next cron window.
 3. After a merge touching `src/` or `app/`, restart the UI container and verify it serves.
 4. The first post-merge cron run's log is read as the phase's final verification.
+
+## 7. Progress log
+
+- **Phase A — done 2026-11-24** (merged to main @ `e471896`, suite 179 green pre- and post-merge, UI restarted and verified). Commits: audit + plan (`dc98110`), remove `canonical_and_siblings` (`fd8a5e0`), remove dead `load_screened_out_df` (`65dec67`), drop PLAN.md docstring reference (`88ded51`), archive one-off scripts (`e471896`). First post-merge verification: the 2026-11-25 07:30 cron run.
