@@ -163,12 +163,20 @@ flowchart TD
     OP -.->|edits| APP
     APP -->|submitted manually| EMP
 
-    UI["Streamlit operator console<br/><i>Jobs · Add Job · Stats</i>"]
-    CLI["job-agent CLI<br/><i>run · generate · doctor · sync-profile</i>"]
+    subgraph VM["muse-vm — always-on VM · Docker dev service"]
+        direction TB
+        UI["Streamlit operator console<br/><i>Jobs · Add Job · Stats</i>"]
+        CLI["job-agent CLI<br/><i>run · discover · sweep · prune-closed · score · generate · ingest<br/>batch-fetch · status · doctor · init-user · drive-auth<br/>sync-profile · tailor-resume · refresh-recs</i>"]
+        CRON["cron<br/><i>Mon 07:30 full run · Tue–Fri 07:30 email-only</i>"]
+        PIPE["Pipeline package<br/><i>discovery · scoring · generation · builders</i>"]
+        DB[("SQLite DB<br/>jobs · scores · applications")]
+        OUT["Application packet<br/><i>drafts in outputs/</i>"]
+        CRON -->|scheduled| CLI
+    end
+
     OP --> UI
     OP --> CLI
 
-    PIPE["Pipeline package<br/><i>discovery · scoring · generation · builders</i>"]
     UI --> PIPE
     CLI --> PIPE
 
@@ -178,8 +186,6 @@ flowchart TD
     ANT --> PIPE
     REF -.->|configures| PIPE
 
-    DB[("SQLite DB<br/>jobs · scores · applications")]
-    OUT["Application packet<br/><i>drafts in outputs/</i>"]
     PIPE --> DB
     PIPE --> OUT
     DB -.->|materials_path| OUT
