@@ -27,6 +27,7 @@ from src.job_agent.db import (
 )
 from src.job_agent.pipeline import score_one, generate_one, mark_posting_status
 from src.job_agent.discovery.manual import fetch_from_url
+from src.job_agent.discovery.fetch import fetch_job_from_url, parse_ats_url
 from src.job_agent.tiers import STRONG_FIT, WORTH_REVIEWING, LONG_SHOT, SKIP
 from src.job_agent.db import job_id as compute_job_id, upsert_job
 from src.job_agent import clustering
@@ -1083,6 +1084,28 @@ def _save_manual_job(company: str, title: str, location: str, description: str, 
     return job_db_id
 
 
+def _fetch_for_form(url: str) -> dict:
+    """Extraction for the Add-Job form.
+
+    Recognized ATS URLs go through the ATS API first (structured fields,
+    canonical location) via discovery.fetch; anything else — and an ATS
+    miss — falls back to the manual HTML cascade, whose partial dict is
+    what the editable form is built for. PostingGone propagates: the
+    caller surfaces it as the fetch-failed warning.
+    """
+    if parse_ats_url(url):
+        job = fetch_job_from_url(url)
+        if job is not None:
+            return {
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "description": job.description_raw or "",
+                "url": job.url,
+            }
+    return fetch_from_url(url)
+
+
 def render_add_job(user_id: int | None):
     st.markdown("## ➕ Add a job by URL")
     st.caption("Paste a job posting URL. The system tries to extract title, company, location, and the JD — review and edit before saving.")
@@ -1108,7 +1131,7 @@ def render_add_job(user_id: int | None):
         st.session_state.add_url_input = url
         with st.spinner("Fetching and extracting…"):
             try:
-                st.session_state.add_fetched = fetch_from_url(url)
+                st.session_state.add_fetched = _fetch_for_form(url)
             except Exception as e:
                 st.session_state.add_fetched = {
                     "title": "", "company": "", "location": "", "description": "", "url": url,
