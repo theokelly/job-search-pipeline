@@ -18,6 +18,7 @@ from ._common import (
     PROFILE_PATH_DEFAULT, _default_echo, init_db, get_session,
     Job, Score, Application, User, UserJobMeta, clustering, logged_run,
 )
+from ..tiers import STRONG_FIT
 
 # App statuses that mean "already moved on" — bulk generation skips these
 # jobs unless forced. interviewing / offer are deliberately NOT in the set:
@@ -41,7 +42,7 @@ def _statused_job_ids(session, user_id: int) -> set:
 @logged_run("generate")
 def run_generate(
     user_slug: str = "theo",
-    tiers: str = "Strong Fit",
+    tiers: str = STRONG_FIT,
     profile_path: str = PROFILE_PATH_DEFAULT,
     echo: Callable[[str], None] = _default_echo,
     force_all_status: bool = False,
