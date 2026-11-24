@@ -266,8 +266,9 @@ Both call the **same** shared code — the stage entry points re-exported from
 
 - **CLI (`job-agent`)** — the batch path: `job-agent run` does sweep → discover →
   prune closed → score. Generation is separate (`job-agent generate`, or per-job from
-  the UI). Plus utilities: `status`, `doctor`, `sync-profile`, `tailor-resume`,
-  `batch-fetch`.
+  the UI). Plus `ingest` (add jobs by URL through the standard gate) and utilities:
+  `status`, `doctor`, `sync-profile`, `tailor-resume`, `batch-fetch`, `refresh-recs`,
+  `init-user`, `drive-auth`.
 - **Streamlit UI** — the operator console: browse and filter jobs, add a job by URL,
   read scores and drafts, trigger single-job score/generate/tailor/cover-letter-Doc
   synchronously, track outcomes, and view pipeline stats.
@@ -291,14 +292,15 @@ Only `active` jobs flow through scoring, generation, and the UI.
 | Path | What lives there |
 |---|---|
 | `src/job_agent/pipeline.py` | Re-export shim over `stages/` — the shared stage entry points. |
-| `src/job_agent/stages/` | Stage implementations: discover, housekeeping, score, generate, single-job. |
-| `src/job_agent/discovery/` | One module per source (LinkedIn, Greenhouse, Lever, email, manual). |
+| `src/job_agent/stages/` | Stage implementations: discover, ingest, housekeeping, score (split into prescreen filter, planning, and batch modules), generate, single-job. |
+| `src/job_agent/discovery/` | One module per source (LinkedIn, Greenhouse, Lever, Ashby, Workday, email alerts, fanout sweep, single-URL fetch, manual). |
 | `src/job_agent/filter.py` | The free rule-based pre-filter. |
 | `src/job_agent/clustering.py` | Cluster-key derivation and canonical selection. |
 | `src/job_agent/scoring/` | Prescreen (Haiku) + score (Sonnet) prompts and logic. |
 | `src/job_agent/generation/` | Cover letter + resume recommendation (Opus). |
 | `src/job_agent/batches.py` | Anthropic Batches API submit/poll/collect helpers. |
 | `src/job_agent/db.py` | SQLModel schema + session helpers. |
+| `src/job_agent/queries.py` | The UI's read models (job list, job detail, stats) — pure DB queries, unit-tested; the app only renders and caches. |
 | `app/streamlit_app.py` | The Streamlit operator console (Jobs / Add Job / Stats). |
 | `profile/` | The person's config, rubric, and source documents (gitignored). |
 | `outputs/` | Generated application materials (gitignored). |
