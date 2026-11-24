@@ -208,6 +208,27 @@ def run(
     typer.echo("\nPipeline complete. Generate materials on demand: per-job in the UI or `job-agent generate`.")
 
 
+@app.command()
+def ingest(
+    urls: list[str] = typer.Argument(..., help="Posting URL(s) to fetch into the DB"),
+    user: str = typer.Option("theo", "--user"),
+    score: bool = typer.Option(False, "--score", help="Run the score stage afterwards (scores all unscored active jobs — normally just these)"),
+):
+    """Ingest individual posting URLs (scan handoffs, one-off finds)."""
+    _bootstrap()
+    from .pipeline import run_ingest, INGESTED, ALREADY_PRESENT, FETCH_FAILED
+    results = run_ingest(urls, user_slug=user, score_after=score, echo=typer.echo)
+    counts = {INGESTED: 0, ALREADY_PRESENT: 0, FETCH_FAILED: 0}
+    for _, outcome, _ in results:
+        counts[outcome] += 1
+    typer.echo(
+        f"\nIngested {counts[INGESTED]}, already present "
+        f"{counts[ALREADY_PRESENT]}, failed {counts[FETCH_FAILED]}."
+    )
+    if results and counts[FETCH_FAILED] == len(results):
+        raise typer.Exit(code=1)
+
+
 @app.command(name="batch-fetch")
 def batch_fetch(
     batch_id: str = typer.Argument(..., help="Batch ID printed by an earlier --batch run"),
